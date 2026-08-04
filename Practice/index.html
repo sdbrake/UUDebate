@@ -268,6 +268,13 @@
 
   <button type="submit">Submit Ballot</button>
   <span id="status"></span>
+
+  <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+    <input type="checkbox" id="csvCopy">
+    <label for="csvCopy" style="margin:0; font-weight:normal; width:auto;">
+      Download a CSV copy of this ballot
+    </label>
+  </div>
 </form>
 
 <script>
@@ -588,6 +595,65 @@
     return dupe;
   }
 
+  // ---- CSV backup download ----
+  // Mirrors Code.gs headerRow() + buildRow() so the file matches the sheet exactly.
+  function csvEscape(v) {
+    var s = String(v == null ? '' : v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function buildCsvRow(payload, sfx, speaker, roundId, stamp) {
+    var row = [stamp, roundId, payload.format || 'IPDA', speaker,
+               payload.judge, payload.date, payload.resolution];
+    ['aff', 'neg'].forEach(function (side) {
+      var p = side + sfx;
+      row.push(payload[p + 'Name'] || '');
+      CATEGORIES.forEach(function (c) { row.push(payload[p + c.key] || ''); });
+      row.push(payload[p + 'Total'] || '');
+    });
+    row.push(payload.winner, payload.lowPointWin, payload.initials,
+             payload['aff' + sfx + 'Liked']   || '', payload['aff' + sfx + 'Improve'] || '',
+             payload['neg' + sfx + 'Liked']   || '', payload['neg' + sfx + 'Improve'] || '',
+             payload.rfd || '',
+             payload['aff' + sfx + 'Focus'] || '', payload['aff' + sfx + 'FocusResponse'] || '',
+             payload['neg' + sfx + 'Focus'] || '', payload['neg' + sfx + 'FocusResponse'] || '');
+    return row.map(csvEscape).join(',');
+  }
+
+  function downloadCsv(payload, roundId) {
+    var header = ['Timestamp','Round ID','Format','Speaker',
+                  'Judge','Date','Resolution'];
+    ['Aff','Neg'].forEach(function (p) {
+      header.push(p + ' Name');
+      CATEGORIES.forEach(function (c) { header.push(p + ' ' + c.label); });
+      header.push(p + ' Points');
+    });
+    header = header.concat(['Winner','Low Point Win?',"Judge's Initials",
+      'Aff Liked Best','Aff Improve','Neg Liked Best','Neg Improve',
+      'Reason for Decision',
+      'Aff Focus','Aff Focus Response','Neg Focus','Neg Focus Response']);
+
+    var stamp = new Date().toISOString();
+    var lines = [header.map(csvEscape).join(',')];
+
+    if (payload.format === 'TIPDA') {
+      lines.push(buildCsvRow(payload, '',  '1', roundId, stamp));
+      lines.push(buildCsvRow(payload, '2', '2', roundId, stamp));
+    } else {
+      lines.push(buildCsvRow(payload, '',  '—', roundId, stamp));
+    }
+
+    var blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ballot_' + (roundId || 'unknown') + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+
   // Submit handler.
   document.getElementById('ballot').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -617,6 +683,9 @@
         if (res.result === 'success') {
           status.textContent = '✓ Ballot submitted!' +
             (res.rows > 1 ? ' (' + res.rows + ' speaker entries)' : '');
+          if (document.getElementById('csvCopy').checked) {
+            downloadCsv(payload, res.roundId);
+          }
           localStorage.removeItem(DRAFT_KEY);
           e.target.reset();
           applyFormat();                    // reset() restores the default format
@@ -627,10 +696,16 @@
           document.querySelector('[name="date"]').value =
             new Date().toISOString().slice(0, 10);
         } else {
-          status.textContent = 'Error: ' + res.message;
+          status.textContent = 'Error: ' + res.message +
+            ' — downloading CSV backup…';
+          downloadCsv(payload, 'FAILED');
         }
       })
-      .catch(function (err) { status.textContent = 'Network error: ' + err; });
+      .catch(function (err) {
+        status.textContent = 'Network error: ' + err +
+          ' — downloading CSV backup…';
+        downloadCsv(payload, 'FAILED');
+      });
   });
 </script>
 </body>
