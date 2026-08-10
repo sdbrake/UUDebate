@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Qualification Progress</title>
+<style>
+  /* ─── RESET & BASE ─── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #f0f2f5; color: #1a1a2e;
+    min-height: 100vh; padding: 1rem;
+  }
+
+  /* ─── LAYOUT ─── */
+  .container { max-width: 600px; margin: 0 auto; }
+
+  /* ─── HEADER ─── */
+  .header {
+    text-align: center; padding: 2rem 1rem 1.5rem;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff; border-radius: 16px 16px 0 0;
+  }
+  .header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: .25rem; }
+  .header .subtitle { font-size: .85rem; opacity: .75; }
+  .header .season { font-size: .8rem; opacity: .6; margin-top: .25rem; }
+
+  /* ─── STATUS BADGE ─── */
+  .status-card {
+    background: #fff; padding: 1.25rem; text-align: center;
+    border-bottom: 1px solid #e4e6ea;
+  }
+  .status-badge {
+    display: inline-block; padding: .35rem 1rem; border-radius: 20px;
+    font-weight: 600; font-size: .95rem; letter-spacing: .02em;
+  }
+  .status-Complete  { background: #d7ecff; color: #0a58a6; }
+  .status-On-track  { background: #e6f4ea; color: #137333; }
+  .status-Due-soon  { background: #fff4e5; color: #b45309; }
+  .status-Behind    { background: #fce8e6; color: #b3261e; }
+  .status-No-data   { background: #f1f3f4; color: #5f6368; }
+
+  .as-of { font-size: .75rem; color: #888; margin-top: .5rem; }
+
+  /* ─── CREDIT COUNTERS ─── */
+  .credits {
+    display: grid; grid-template-columns: 1fr 1fr;
+    background: #fff; border-bottom: 1px solid #e4e6ea;
+  }
+  .credit-box {
+    padding: 1.25rem; text-align: center;
+    border-right: 1px solid #e4e6ea;
+  }
+  .credit-box:last-child { border-right: none; }
+  .credit-box .label { font-size: .75rem; text-transform: uppercase;
+    letter-spacing: .06em; color: #666; margin-bottom: .25rem; }
+  .credit-box .count { font-size: 2rem; font-weight: 700; }
+  .credit-box .target { font-size: .8rem; color: #999; }
+
+  /* ─── NEEDS SECTION ─── */
+  .needs {
+    background: #fff; padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e4e6ea;
+  }
+  .needs h3 { font-size: .85rem; color: #666; margin-bottom: .5rem; }
+  .needs .need-item {
+    display: flex; justify-content: space-between;
+    padding: .3rem 0; font-size: .9rem;
+  }
+  .needs .need-item .amount {
+    font-weight: 600;
+    color: #b3261e;
+  }
+  .needs .need-item .amount.done { color: #137333; }
+
+  /* ─── MILESTONES ─── */
+  .milestones {
+    background: #fff; padding: 1rem 1.25rem;
+    border-radius: 0 0 16px 16px;
+  }
+  .milestones h3 {
+    font-size: .85rem; color: #666; margin-bottom: .75rem;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .milestone {
+    display: flex; align-items: flex-start; gap: .75rem;
+    padding: .6rem 0; border-bottom: 1px solid #f0f0f0;
+  }
+  .milestone:last-child { border-bottom: none; }
+  .milestone .icon {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; flex-shrink: 0; margin-top: 2px;
+  }
+  .icon.met    { background: #e6f4ea; color: #137333; }
+  .icon.missed { background: #fce8e6; color: #b3261e; }
+  .icon.future { background: #f1f3f4; color: #999; }
+  .milestone .info { flex: 1; }
+  .milestone .deadline { font-weight: 600; font-size: .9rem; }
+  .milestone .detail { font-size: .8rem; color: #888; margin-top: 2px; }
+  .milestone .progress-nums { font-size: .8rem; color: #555; margin-top: 2px; }
+
+  /* ─── LAST ACTIVITY ─── */
+  .last-activity {
+    text-align: center; padding: .75rem;
+    font-size: .8rem; color: #999;
+    background: #fff; border-top: 1px solid #e4e6ea;
+  }
+
+  /* ─── MISSED DEADLINES ─── */
+  .missed {
+    background: #fff; padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e4e6ea;
+  }
+  .missed h3 { font-size: .85rem; color: #b3261e; margin-bottom: .5rem; }
+  .missed ul { list-style: none; padding: 0; }
+  .missed li {
+    font-size: .85rem; color: #b3261e; padding: .2rem 0;
+  }
+  .missed li::before { content: '⚠ '; }
+
+  /* ─── LOADING / ERROR ─── */
+  .loading, .error-msg {
+    text-align: center; padding: 3rem 1rem;
+    background: #fff; border-radius: 16px;
+  }
+  .loading { color: #666; }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid #e4e6ea;
+    border-top-color: #1a1a2e; border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg { color: #b3261e; }
+  .error-msg h2 { margin-bottom: .5rem; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 400px) {
+    .credit-box .count { font-size: 1.6rem; }
+    .header h1 { font-size: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container" id="app">
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Loading your progress…</p>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   CONFIGURATION — change this after deploying your Apps Script web app.
+   ═══════════════════════════════════════════════════════════════════════ */
+var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_Dc5ED9xRM69UubolDIIB0xDHP_-F0-9ed9IaVI-YpT/exec';
+// Example: 'https://script.google.com/macros/s/AKfyc.../exec'
+// If using the combined doGet approach, append ?mode=student
+// If using a separate deployment, just the /exec URL works.
+/* ═══════════════════════════════════════════════════════════════════════ */
+
+(function () {
+  var app = document.getElementById('app');
+
+  // Read token from URL
+  var params = new URLSearchParams(window.location.search);
+  var token = (params.get('token') || '').trim();
+
+  if (!token) {
+    showError('No Token', 'This link is missing a student token. ' +
+      'Check the URL your coach gave you.');
+    return;
+  }
+
+  // Fetch from Apps Script
+  var url = API_URL + (API_URL.indexOf('?') >= 0 ? '&' : '?') + 'token=' +
+    encodeURIComponent(token);
+
+  fetch(url)
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.error) { showError('Error', data.error); return; }
+      render(data);
+    })
+    .catch(function (err) {
+      showError('Connection Error',
+        'Could not reach the server. Try refreshing in a moment.');
+    });
+
+  function showError(title, msg) {
+    app.innerHTML = '<div class="error-msg"><h2>' + esc(title) + '</h2>' +
+      '<p>' + esc(msg) + '</p></div>';
+  }
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function render(d) {
+    var statusClass = 'status-' + d.status.replace(/\s+/g, '-');
+    var practiceNeeded = d.practiceNeeded || 0;
+    var serviceNeeded = d.serviceNeeded || 0;
+
+    var html = '';
+
+    // Header
+    html += '<div class="header">';
+    html += '<h1>' + esc(d.name) + '</h1>';
+    html += '<div class="subtitle">Qualification Progress</div>';
+    if (d.seasonName) html += '<div class="season">' + esc(d.seasonName) + ' Season</div>';
+    html += '</div>';
+
+    // Status badge
+    html += '<div class="status-card">';
+    html += '<span class="status-badge ' + statusClass + '">' + esc(d.status) + '</span>';
+    html += '<div class="as-of">as of ' + esc(d.asOf) + '</div>';
+    html += '</div>';
+
+    // Credit counters
+    html += '<div class="credits">';
+    html += '<div class="credit-box">';
+    html += '<div class="label">Practice Rounds</div>';
+    html += '<div class="count">' + d.practice + '</div>';
+    html += '<div class="target">of ' + d.nextPracticeTarget + ' needed</div>';
+    html += '</div>';
+    html += '<div class="credit-box">';
+    html += '<div class="label">Service Credits</div>';
+    html += '<div class="count">' + d.service + '</div>';
+    html += '<div class="target">of ' + d.nextServiceTarget + ' needed</div>';
+    html += '</div>';
+    html += '</div>';
+
+    // What's needed next
+    html += '<div class="needs">';
+    html += '<h3>Needed by ' + esc(d.nextDeadline) + '</h3>';
+    html += '<div class="need-item"><span>Practice rounds</span>';
+    html += '<span class="amount' + (practiceNeeded === 0 ? ' done' : '') + '">' +
+      (practiceNeeded === 0 ? '✓ Met' : practiceNeeded + ' more') + '</span></div>';
+    html += '<div class="need-item"><span>Service credits</span>';
+    html += '<span class="amount' + (serviceNeeded === 0 ? ' done' : '') + '">' +
+      (serviceNeeded === 0 ? '✓ Met' : serviceNeeded + ' more') + '</span></div>';
+    html += '</div>';
+
+    // Missed deadlines (if any)
+    if (d.missed && d.missed.length) {
+      html += '<div class="missed">';
+      html += '<h3>Missed Deadlines</h3><ul>';
+      d.missed.forEach(function (m) {
+        html += '<li>' + esc(m) + '</li>';
+      });
+      html += '</ul></div>';
+    }
+
+    // Milestones timeline
+    html += '<div class="milestones">';
+    html += '<h3>Season Milestones</h3>';
+    d.milestones.forEach(function (m) {
+      var iconClass = m.passed ? (m.met ? 'met' : 'missed') : 'future';
+      var iconChar = m.passed ? (m.met ? '✓' : '✗') : '○';
+      html += '<div class="milestone">';
+      html += '<div class="icon ' + iconClass + '">' + iconChar + '</div>';
+      html += '<div class="info">';
+      html += '<div class="deadline">' + esc(m.deadline) + '</div>';
+      html += '<div class="progress-nums">' + m.practiceEarned + '/' +
+        m.practiceTarget + ' practice · ' + m.serviceEarned + '/' +
+        m.serviceTarget + ' service</div>';
+      if (m.notes) html += '<div class="detail">' + esc(m.notes) + '</div>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+
+    // Last activity
+    if (d.lastActivity) {
+      html += '<div class="last-activity">Last recorded activity: ' +
+        esc(d.lastActivity) + '</div>';
+    }
+
+    app.innerHTML = html;
+  }
+})();
+</script>
+</body>
+</html>
