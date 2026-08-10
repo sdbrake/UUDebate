@@ -154,7 +154,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    CONFIGURATION — change this after deploying your Apps Script web app.
    ═══════════════════════════════════════════════════════════════════════ */
-var API_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_Dc5ED9xRM69UubolDIIB0xDHP_-F0-9ed9IaVI-YpT/exec';
 // Example: 'https://script.google.com/macros/s/AKfyc.../exec'
 // If using the combined doGet approach, append ?mode=student
 // If using a separate deployment, just the /exec URL works.
