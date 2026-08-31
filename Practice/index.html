@@ -144,10 +144,12 @@
     <input name="resolution" required>
 
     <div class="lowpoint" style="margin-top:10px;">
-      <input type="checkbox" id="panelRound" name="panel" value="Yes">
+      <input type="checkbox" id="panelRound" name="panelCheck" value="Yes">
       <label for="panelRound" style="font-weight:normal;">
-        <span class="tip" data-tip="Check this if more than one judge is scoring this round. Panel ballots are tracked so debaters aren't credited multiple times for the same round.">Panel round (multiple judges)? ⓘ</span>
+        <span class="tip" data-tip="Check this if more than one judge is scoring this round. All judges in the panel should enter the same code word so the system can match your ballots together.">Panel round (multiple judges)? ⓘ</span>
       </label>
+      <input name="panelCode" id="panelCode" placeholder="Shared code word (e.g. banana)"
+             style="display:none; margin-top:6px;">
     </div>
   </fieldset>
 
@@ -486,6 +488,16 @@
         otherInput.value = '';
       }
     }
+    if (e.target.id === 'panelRound') {
+      var codeInput = document.getElementById('panelCode');
+      if (e.target.checked) {
+        codeInput.style.display = '';
+        codeInput.focus();
+      } else {
+        codeInput.style.display = 'none';
+        codeInput.value = '';
+      }
+    }
   });
 
   // Autofill today's date (format YYYY-MM-DD for the date input).
@@ -554,6 +566,16 @@
     } else {
       judgeOther.style.display = 'none';
       judgeOther.required = false;
+    }
+
+    // Re-sync panel code state
+    var panelCheck = document.getElementById('panelRound');
+    var panelCodeInput = document.getElementById('panelCode');
+    if (panelCheck.checked) {
+      panelCodeInput.style.display = '';
+      if (draft.panelCode) panelCodeInput.value = draft.panelCode;
+    } else {
+      panelCodeInput.style.display = 'none';
     }
     // Focus answers restore LAST: updateFocus() clears the box when the question
     // changes, so setting the text any earlier would wipe it.
@@ -670,7 +692,7 @@
              payload.rfd || '',
              payload['aff' + sfx + 'Focus'] || '', payload['aff' + sfx + 'FocusResponse'] || '',
              payload['neg' + sfx + 'Focus'] || '', payload['neg' + sfx + 'FocusResponse'] || '',
-             payload.panel || 'No');
+             payload.panel || '');
     return row.map(csvEscape).join(',');
   }
 
@@ -724,7 +746,13 @@
     // Disabled (non-TIPDA, no-focus) fields are automatically excluded from FormData.
     const payload = Object.fromEntries(new FormData(e.target).entries());
     if (!payload.lowPointWin) payload.lowPointWin = 'No';
-    if (!payload.panel) payload.panel = 'No';
+
+    // Panel: send the code string if checked, empty string if not.
+    // The code is normalized to lowercase+trimmed for matching.
+    var panelCode = (payload.panelCode || '').trim().toLowerCase();
+    payload.panel = document.getElementById('panelRound').checked ? (panelCode || 'Yes') : '';
+    delete payload.panelCheck;
+    delete payload.panelCode;
 
     // Resolve judge name: use the typed name when "Other Judge" is selected
     if (payload.judge === '__other__') {
@@ -754,6 +782,8 @@
           // Reset judge "Other" state
           document.getElementById('judgeOther').style.display = 'none';
           document.getElementById('judgeOther').required = false;
+          // Reset panel code state
+          document.getElementById('panelCode').style.display = 'none';
           SIDES.forEach(function (side) {
             updateTotal(side); updateNameLabels(side); updateFocus(side);
           });
