@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UU Debate Ballot</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 950px;
+         margin: 24px auto; padding: 0 16px; color: #1a1a1a; }
+  h1 { text-align: center; margin-bottom: 4px; }
+  fieldset { border: 1px solid #ccc; border-radius: 8px; margin-bottom: 16px; }
+  legend { font-weight: bold; padding: 0 8px; }
+  label { display: block; margin: 10px 0 4px; font-weight: 600; }
+  input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box;
+         border: 1px solid #bbb; border-radius: 6px; font-size: 15px;
+         font-family: inherit; }
+  textarea { min-height: 80px; resize: vertical; }
+
+  .panels { display: flex; gap: 16px; }
+  .panel { flex: 1; }
+  .panel.aff { border-left: 5px solid #2a6df4; }
+  .panel.neg { border-left: 5px solid #e0443e; }
+  @media (max-width: 680px) { .panels { flex-direction: column; } }
+
+  /* CATEGORY SCORING TABLE */
+  table.cats { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table.cats th, table.cats td { text-align: center; padding: 6px 2px;
+         border-bottom: 1px solid #eee; }
+  table.cats td:first-child { text-align: left; font-weight: 600; }
+  table.cats input[type="radio"] { width: auto; }
+  .total { margin-top: 10px; font-weight: bold; font-size: 16px; }
+  .total span { color: #2a6df4; }
+
+  /* MOUSEOVER TOOLTIP */
+  .tip { border-bottom: 1px dotted #666; cursor: help; position: relative; }
+  .tip:hover::after {
+    content: attr(data-tip);
+    position: absolute; left: 0; top: 135%; z-index: 10; white-space: pre-line;
+    background: #222; color: #fff; padding: 10px 12px;
+    border-radius: 6px; width: 240px; font-weight: normal; font-size: 13px;
+    line-height: 1.4; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }
+
+  .lowpoint { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .lowpoint input { width: auto; }
+  .lowpoint label { margin: 0; }
+
+  button { background: #2a6df4; color: #fff; border: none; font-size: 16px;
+           padding: 12px 28px; border-radius: 8px; cursor: pointer; }
+  #status { margin-left: 14px; font-weight: bold; }
+
+  /* WINNER HIGHLIGHT */
+  .panel.winner-glow {
+    background: #fffbea;
+    box-shadow: 0 0 0 3px #f5c518, 0 4px 14px rgba(0,0,0,.15);
+    border-radius: 8px;
+    padding: 4px 14px 14px;
+    transition: box-shadow .2s, background .2s;
+  }
+  .panel.winner-glow legend {
+    background: #fffbea;
+    padding: 0 8px;
+  }
+  .panel.winner-glow legend::after {
+    content: " 🏆 WINNER";
+    color: #b8860b;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  /* DRAFT RESTORE BANNER */
+  #draftBanner {
+    display: none;               /* shown via JS only when a draft exists */
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: #fff8e1;
+    border: 1px solid #f5c518;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  #draftBanner button { font-size: 14px; padding: 8px 16px; margin-left: 8px; }
+  #discardBtn { background: #e0443e; }
+
+  /* TIPDA-ONLY BLOCKS: hidden unless the format is TIPDA */
+  .tipdaOnly { display: none; }
+  body.tipda .tipdaOnly { display: flex; }
+
+  /* COMPETITOR NAME SHOWN IN PANEL LEGENDS */
+  .nameTag { color: #444; font-weight: 600; }
+
+  /* PRACTICE-FOCUS BOX (shown only for students with a focus on file) */
+  .focusBox {
+    display: none;                  /* revealed by JS when a focus applies */
+    background: #eef4ff;
+    border: 1px solid #2a6df4;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 12px;
+  }
+  .focusBox .focusLabel { margin-top: 0; color: #14418c; }
+  .focusBox .focusLabel::before { content: "🎯 "; }
+</style>
+</head>
+<body>
+
+<h1>UU Debate Practice Ballot</h1>
+
+<div id="draftBanner">
+  <span>Saved recovery drafts (other tabs may still be editing):
+    <select id="draftSelect" aria-label="Choose a saved ballot draft"></select>
+  </span>
+  <span class="draftBtns">
+    <button type="button" id="restoreBtn">Restore draft</button>
+    <button type="button" id="discardBtn">Discard</button>
+  </span>
+</div>
+
+<form id="ballot">
+
+  <fieldset>
+    <legend>Round Information</legend>
+    <div class="panels">
+      <div class="panel"><label>Judge</label>
+        <select name="judge" id="judgeSelect" required>
+          <option value="">-- select judge --</option>
+        </select>
+        <input name="judgeOther" id="judgeOther" placeholder="Judge name"
+               style="display:none; margin-top:6px;"></div>
+      <div class="panel"><label>Date</label>
+        <input name="date" type="date" required></div>
+      <div class="panel">
+        <label>
+          <span class="tip" data-tip="IPDA is one-on-one: a single Affirmative and a single Negative speaker.&#10;&#10;TIPDA is two-on-two: each side has two speakers, so the ballot adds a second speaker box and comment box per side.">Format ⓘ</span>
+        </label>
+        <select name="format" id="formatSelect" required>
+          <option value="IPDA">IPDA (1 on 1)</option>
+          <option value="TIPDA">TIPDA (2 on 2)</option>
+        </select>
+      </div>
+    </div>
+    <label>Resolution</label>
+    <input name="resolution" required>
+
+    <div class="lowpoint" style="margin-top:10px;">
+      <input type="checkbox" id="panelRound" name="panelCheck" value="Yes">
+      <label for="panelRound" style="font-weight:normal;">
+        <span class="tip" data-tip="Check this if more than one judge is scoring this round. All judges in the panel should enter the same code word so the system can match your ballots together.">Panel round (multiple judges)? ⓘ</span>
+      </label>
+      <input name="panelCode" id="panelCode" placeholder="Shared code word (e.g. banana)"
+             style="display:none; margin-top:6px;">
+    </div>
+  </fieldset>
+
+  <!-- SPEAKER SCORING — FIRST SPEAKERS (both formats) -->
+  <div class="panels">
+    <fieldset class="panel aff" id="affPanel" data-team="aff">
+      <legend><span class="sideLabel" data-ipda="Affirmative"
+        data-tipda="Affirmative — Speaker 1">Affirmative</span><span
+        class="nameTag" data-name-tag="aff"></span></legend>
+      <label>Competitor Name</label>
+      <select name="affName" class="nameSelect" required>
+        <option value="">-- select competitor --</option>
+      </select>
+      <div class="catHolder" data-side="aff"></div>
+      <div class="total">Total: <span id="affTotalDisplay">0</span> / 40</div>
+    </fieldset>
+
+    <fieldset class="panel neg" id="negPanel" data-team="neg">
+      <legend><span class="sideLabel" data-ipda="Negative"
+        data-tipda="Negative — Speaker 1">Negative</span><span
+        class="nameTag" data-name-tag="neg"></span></legend>
+      <label>Competitor Name</label>
+      <select name="negName" class="nameSelect" required>
+        <option value="">-- select competitor --</option>
+      </select>
+      <div class="catHolder" data-side="neg"></div>
+      <div class="total">Total: <span id="negTotalDisplay">0</span> / 40</div>
+    </fieldset>
+  </div>
+
+  <!-- SPEAKER SCORING — SECOND SPEAKERS (TIPDA only) -->
+  <div class="panels tipdaOnly" id="tipdaScoring">
+    <fieldset class="panel aff" id="aff2Panel" data-team="aff">
+      <legend><span class="sideLabel" data-ipda="Affirmative — Speaker 2"
+        data-tipda="Affirmative — Speaker 2">Affirmative — Speaker 2</span><span
+        class="nameTag" data-name-tag="aff2"></span></legend>
+      <label>Competitor Name</label>
+      <select name="aff2Name" class="nameSelect" required>
+        <option value="">-- select competitor --</option>
+      </select>
+      <div class="catHolder" data-side="aff2"></div>
+      <div class="total">Total: <span id="aff2TotalDisplay">0</span> / 40</div>
+    </fieldset>
+
+    <fieldset class="panel neg" id="neg2Panel" data-team="neg">
+      <legend><span class="sideLabel" data-ipda="Negative — Speaker 2"
+        data-tipda="Negative — Speaker 2">Negative — Speaker 2</span><span
+        class="nameTag" data-name-tag="neg2"></span></legend>
+      <label>Competitor Name</label>
+      <select name="neg2Name" class="nameSelect" required>
+        <option value="">-- select competitor --</option>
+      </select>
+      <div class="catHolder" data-side="neg2"></div>
+      <div class="total">Total: <span id="neg2TotalDisplay">0</span> / 40</div>
+    </fieldset>
+  </div>
+
+  <!-- DECISION -->
+  <fieldset>
+    <legend>Decision</legend>
+    <label>I vote for the:</label>
+    <select name="winner" required>
+      <option value="">-- choose one --</option>
+      <option value="Affirmative">Affirmative</option>
+      <option value="Negative">Negative</option>
+    </select>
+
+    <label>Judge's Initials</label>
+    <input name="initials" required>
+
+    <div class="lowpoint">
+      <input type="checkbox" id="lpw" name="lowPointWin" value="Yes">
+      <label for="lpw">
+        <span class="tip" data-tip="Check this if you are awarding the win to the competitor with FEWER speaker points because you feel they won the debate.">Low point win? ⓘ</span>
+      </label>
+    </div>
+  </fieldset>
+
+  <!-- COMMENTS — FIRST SPEAKERS (both formats) -->
+  <div class="panels">
+    <fieldset class="panel aff" data-comment-side="aff">
+      <legend><span class="sideLabel" data-ipda="Affirmative Comments"
+        data-tipda="Affirmative Comments — Speaker 1">Affirmative Comments</span><span
+        class="nameTag" data-name-tag="aff"></span></legend>
+      <label class="likedLabel">What did you like best?</label>
+      <textarea name="affLiked"></textarea>
+      <label class="improveLabel">Where can they improve?</label>
+      <textarea name="affImprove"></textarea>
+    </fieldset>
+
+    <fieldset class="panel neg" data-comment-side="neg">
+      <legend><span class="sideLabel" data-ipda="Negative Comments"
+        data-tipda="Negative Comments — Speaker 1">Negative Comments</span><span
+        class="nameTag" data-name-tag="neg"></span></legend>
+      <label class="likedLabel">What did you like best?</label>
+      <textarea name="negLiked"></textarea>
+      <label class="improveLabel">Where can they improve?</label>
+      <textarea name="negImprove"></textarea>
+    </fieldset>
+  </div>
+
+  <!-- COMMENTS — SECOND SPEAKERS (TIPDA only) -->
+  <div class="panels tipdaOnly" id="tipdaComments">
+    <fieldset class="panel aff" data-comment-side="aff2">
+      <legend><span class="sideLabel" data-ipda="Affirmative Comments — Speaker 2"
+        data-tipda="Affirmative Comments — Speaker 2">Affirmative Comments — Speaker 2</span><span
+        class="nameTag" data-name-tag="aff2"></span></legend>
+      <label class="likedLabel">What did you like best?</label>
+      <textarea name="aff2Liked"></textarea>
+      <label class="improveLabel">Where can they improve?</label>
+      <textarea name="aff2Improve"></textarea>
+    </fieldset>
+
+    <fieldset class="panel neg" data-comment-side="neg2">
+      <legend><span class="sideLabel" data-ipda="Negative Comments — Speaker 2"
+        data-tipda="Negative Comments — Speaker 2">Negative Comments — Speaker 2</span><span
+        class="nameTag" data-name-tag="neg2"></span></legend>
+      <label class="likedLabel">What did you like best?</label>
+      <textarea name="neg2Liked"></textarea>
+      <label class="improveLabel">Where can they improve?</label>
+      <textarea name="neg2Improve"></textarea>
+    </fieldset>
+  </div>
+
+  <fieldset>
+    <legend>Reason(s) for Your Decision</legend>
+    <textarea name="rfd" style="min-height:140px" required></textarea>
+  </fieldset>
+
+  <button type="submit">Submit Ballot</button>
+  <span id="status"></span>
+
+  <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+    <input type="checkbox" id="csvCopy">
+    <label for="csvCopy" style="margin:0; font-weight:normal; width:auto;">
+      Download a CSV copy of this ballot
+    </label>
+  </div>
+</form>
+
+<script>
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOEI7UvSIMHOn3OYa5QQJzuap6ImcWBicyfutAdEV1Ox2DeSfxgjnKfRi6jJcH0xo7/exec";
+
+  // Every scoreable speaker slot. The "2" slots only apply to TIPDA.
+  const SIDES = ['aff', 'neg', 'aff2', 'neg2'];
+
+  // The eight categories, with their tooltip explanations.
+  const CATEGORIES = [
+    { key: 'Delivery', label: 'Delivery',
+      tip: 'How well the debater speaks and carries themselves.' },
+    { key: 'Courtesy', label: 'Courtesy',
+      tip: 'How well the debater treats their opponents, judges, and subjects of discussion.' },
+    { key: 'AppropriateTone', label: 'Appropriate Tone',
+      tip: 'How well the debater appropriately matches the way they talk to the subject matter, the round, and the people in the room.' },
+    { key: 'Organization', label: 'Organization',
+      tip: 'How well the debater organizes their speeches and helps everyone follow along with their arguments.' },
+    { key: 'Logic', label: 'Logic',
+      tip: "How well the debater's arguments make sense, maintain consistency, and prove their side." },
+    { key: 'Support', label: 'Support',
+      tip: 'How well the debater supports their arguments with evidence, reason, examples, etc.' },
+    { key: 'CrossExamination', label: 'Cross Examination',
+      tip: 'How the debater uses their questions and answers.' },
+    { key: 'Refutation', label: 'Refutation',
+      tip: 'How well the debater answers arguments from the other side and responds to them.' }
+  ];
+
+  function isTipda() {
+    return document.getElementById('formatSelect').value === 'TIPDA';
+  }
+
+  // Build a 1–5 scoring table for one speaker slot.
+  function buildTable(side) {
+    let header = '<tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th></tr>';
+    let rows = CATEGORIES.map(function (c) {
+      let radios = [1,2,3,4,5].map(function (n) {
+        return '<td><input type="radio" data-side="' + side + '" name="' + side + c.key +
+               '" value="' + n + '" required></td>';
+      }).join('');
+      return '<tr><td><span class="tip" data-tip="' + c.tip + '">' +
+             c.label + ' ⓘ</span></td>' + radios + '</tr>';
+    }).join('');
+    return '<table class="cats">' + header + rows + '</table>';
+  }
+
+  // Add up the checked radios for one slot and update its total.
+  function updateTotal(side) {
+    let sum = 0;
+    CATEGORIES.forEach(function (c) {
+      let sel = document.querySelector('input[name="' + side + c.key + '"]:checked');
+      if (sel) sum += parseInt(sel.value, 10);
+    });
+    const display = document.getElementById(side + 'TotalDisplay');
+    if (display) display.textContent = sum;
+    return sum;
+  }
+
+  // Put the chosen competitor's name into that slot's comment labels and legends.
+  function updateNameLabels(side) {
+    const sel = document.querySelector('[name="' + side + 'Name"]');
+    const name = (sel && sel.value) ? sel.value : '';
+
+    const block = document.querySelector('[data-comment-side="' + side + '"]');
+    if (block) {
+      block.querySelector('.likedLabel').textContent = name
+        ? 'What did you like best about ' + name + '?'
+        : 'What did you like best?';
+      block.querySelector('.improveLabel').textContent = name
+        ? 'Where can ' + name + ' improve?'
+        : 'Where can they improve?';
+    }
+
+    document.querySelectorAll('[data-name-tag="' + side + '"]').forEach(function (tag) {
+      tag.textContent = name ? ': ' + name : '';
+    });
+  }
+
+  // Re-apply the winner glow to whichever side won (both of its panels in TIPDA).
+  function refreshWinnerGlow() {
+    const winner = document.querySelector('[name="winner"]').value;
+    document.querySelectorAll('[data-team]').forEach(function (panel) {
+      const team = panel.getAttribute('data-team');
+      const isWinner = (winner === 'Affirmative' && team === 'aff') ||
+                       (winner === 'Negative'    && team === 'neg');
+      panel.classList.toggle('winner-glow', isWinner);
+    });
+  }
+
+  // ---- Per-student practice focuses (loaded from roster.json) ----
+  let FOCUSES = {};
+
+  // Turn a roster focus entry into a label (for the sheet) and a question (for the judge).
+  function focusFor(name) {
+    const f = FOCUSES[name];
+    if (!f) return null;
+    if (typeof f === 'string') {
+      return { label: f, question: 'What did you think of ' + name + "'s " + f + '?' };
+    }
+    return { label: f.label || f.question || '', question: f.question || '' };
+  }
+
+  // Show, hide, or relabel one slot's focus box based on who's selected.
+  function updateFocus(side) {
+    const box = document.querySelector('[data-focus-side="' + side + '"]');
+    if (!box) return;
+    const sel    = document.querySelector('[name="' + side + 'Name"]');
+    const area   = box.querySelector('textarea');
+    const hidden = box.querySelector('input[type="hidden"]');
+    const label  = box.querySelector('.focusLabel');
+
+    // Slot must be active (TIPDA-aware) and have a named student with a focus.
+    const focus = (sel && !sel.disabled && sel.value) ? focusFor(sel.value) : null;
+
+    if (!focus) {
+      if (box.dataset.focusFor) area.value = '';   // drop an answer that no longer applies
+      box.dataset.focusFor = '';
+      hidden.value = '';
+      area.disabled = hidden.disabled = true;      // excluded from FormData
+      box.style.display = 'none';
+      return;
+    }
+    if (box.dataset.focusFor !== focus.question) {
+      area.value = '';                             // different student or focus → fresh box
+      box.dataset.focusFor = focus.question;
+    }
+    label.textContent = focus.question;
+    hidden.value = focus.label;
+    area.disabled = hidden.disabled = false;
+    box.style.display = 'block';
+  }
+
+  // Show/hide the second-speaker blocks and disable their fields when unused.
+  // Disabling matters: a hidden field that is still `required` blocks submission,
+  // and disabled fields are also excluded from FormData, keeping IPDA payloads clean.
+  function applyFormat() {
+    const tipda = isTipda();
+    document.body.classList.toggle('tipda', tipda);
+
+    document.querySelectorAll('.tipdaOnly').forEach(function (block) {
+      block.querySelectorAll('input, select, textarea').forEach(function (f) {
+        f.disabled = !tipda;
+      });
+    });
+
+    document.querySelectorAll('.sideLabel').forEach(function (el) {
+      el.textContent = el.getAttribute(tipda ? 'data-tipda' : 'data-ipda');
+    });
+
+    SIDES.forEach(function (side) { updateNameLabels(side); updateFocus(side); });
+    refreshWinnerGlow();
+  }
+
+  // Insert all four scoring tables (hidden ones are simply disabled later).
+  document.querySelectorAll('.catHolder').forEach(function (holder) {
+    holder.innerHTML = buildTable(holder.getAttribute('data-side'));
+  });
+
+  // Inject a focus box into each comment panel (same pattern as the score tables,
+  // so the field names are generated, never hand-typed).
+  document.querySelectorAll('[data-comment-side]').forEach(function (block) {
+    const side = block.getAttribute('data-comment-side');
+    const box = document.createElement('div');
+    box.className = 'focusBox';
+    box.setAttribute('data-focus-side', side);
+    box.innerHTML =
+      '<label class="focusLabel"></label>' +
+      '<textarea name="' + side + 'FocusResponse"></textarea>' +
+      '<input type="hidden" name="' + side + 'Focus" value="">';
+    block.appendChild(box);
+  });
+
+  // One change handler for scores, names, winner, and format.
+  document.getElementById('ballot').addEventListener('change', function (e) {
+    if (e.target.type === 'radio' && e.target.dataset.side) {
+      updateTotal(e.target.dataset.side);
+    }
+    if (e.target.classList.contains('nameSelect')) {
+      const slot = e.target.name.replace(/Name$/, '');
+      updateNameLabels(slot);
+      updateFocus(slot);
+    }
+    if (e.target.name === 'winner') {
+      refreshWinnerGlow();
+    }
+    if (e.target.id === 'formatSelect') {
+      applyFormat();
+    }
+    if (e.target.id === 'judgeSelect') {
+      var otherInput = document.getElementById('judgeOther');
+      if (e.target.value === '__other__') {
+        otherInput.style.display = '';
+        otherInput.required = true;
+        otherInput.focus();
+      } else {
+        otherInput.style.display = 'none';
+        otherInput.required = false;
+        otherInput.value = '';
+      }
+    }
+    if (e.target.id === 'panelRound') {
+      var codeInput = document.getElementById('panelCode');
+      if (e.target.checked) {
+        codeInput.style.display = '';
+        codeInput.focus();
+      } else {
+        codeInput.style.display = 'none';
+        codeInput.value = '';
+      }
+    }
+  });
+
+  // Autofill today's date (format YYYY-MM-DD for the date input).
+  document.querySelector('[name="date"]').value =
+    new Date().toISOString().slice(0, 10);
+
+  applyFormat();   // start in the correct format state (IPDA by default)
+
+  // ---- Draft autosave + restore banner ----
+  const DRAFT_KEY = 'bulldogBallotDraft';
+  const DRAFT_PREFIX = DRAFT_KEY + ':';
+  let draftKey = DRAFT_PREFIX + newSubmissionId(); // private to this page, even in duplicated tabs
+  let recoverySource = null;
+  let autosaveOn = false;
+  let submissionId = '';
+  let submitting = false;
+
+  function newSubmissionId() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+  }
+
+  function setSubmitting(value) {
+    submitting = value;
+    document.querySelector('button[type="submit"]').disabled = value;
+  }
+
+  function draftEntries() {
+    const entries = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key !== DRAFT_KEY && !key.startsWith(DRAFT_PREFIX)) continue;
+        const raw = localStorage.getItem(key);
+        try {
+          const data = JSON.parse(raw);
+          if (data && typeof data === 'object') entries.push({ key, raw, data });
+        } catch (err) { /* Leave unreadable legacy recovery data untouched. */ }
+      }
+    } catch (err) { /* Storage unavailable. */ }
+    return entries;
+  }
+
+  function selectedDraft() {
+    const entries = draftEntries();
+    const selected = document.getElementById('draftSelect').value;
+    return selected ? (entries.find(entry => entry.key === selected) || null) : (entries[0] || null);
+  }
+
+  function readDraft() {
+    const entry = selectedDraft();
+    return entry ? entry.data : null;
+  }
+
+  function showDraftChoices() {
+    const select = document.getElementById('draftSelect');
+    select.textContent = '';
+    draftEntries().forEach(function (entry) {
+      const option = document.createElement('option');
+      option.value = entry.key;
+      option.textContent = [entry.data.date, entry.data.affName, entry.data.negName,
+        entry.data.submissionId || 'older draft'].filter(Boolean).join(' — ');
+      select.appendChild(option);
+    });
+    document.getElementById('draftBanner').style.display = readDraft() ? 'flex' : 'none';
+  }
+
+  function clearSubmittedDraft(id, raw) {
+    const saved = localStorage.getItem(draftKey);
+    if (saved === raw && JSON.parse(saved).submissionId === id) localStorage.removeItem(draftKey);
+    // A restored legacy/other-page snapshot is removed only if it is still unchanged.
+    if (recoverySource && localStorage.getItem(recoverySource.key) === recoverySource.raw &&
+        (!recoverySource.data.submissionId || recoverySource.data.submissionId === id)) {
+      localStorage.removeItem(recoverySource.key);
+    }
+  }
+
+  function saveDraft() {
+    if (!submissionId) submissionId = newSubmissionId();
+    const draft = {};
+    new FormData(document.getElementById('ballot')).forEach(function (value, key) {
+      draft[key] = value;
+    });
+    draft.lowPointWin = document.getElementById('lpw').checked ? 'Yes' : '';
+    draft.submissionId = submissionId;
+    const raw = JSON.stringify(draft);
+    try { localStorage.setItem(draftKey, raw); }
+    catch (err) { /* storage blocked/full (e.g. private mode) — fail silently */ }
+    return raw;
+  }
+
+  function restoreDraft() {
+    recoverySource = selectedDraft();
+    const draft = recoverySource ? recoverySource.data : null;
+    if (!draft) return;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.submissionId || '')) submissionId = draft.submissionId;
+
+    // Format first, so the TIPDA fields exist and are enabled before we fill them.
+    if (draft.format) {
+      document.getElementById('formatSelect').value = draft.format;
+      applyFormat();
+    }
+
+    Object.keys(draft).forEach(function (key) {
+      if (key === 'format' || key === 'submissionId') return;
+      if (/Focus$|FocusResponse$/.test(key)) return;   // handled below
+      const fields = document.querySelectorAll('[name="' + key + '"]');
+      if (!fields.length) return;
+      const field = fields[0];
+      if (field.type === 'checkbox') {
+        field.checked = (draft[key] === 'Yes');
+      } else if (field.type === 'radio') {
+        const match = document.querySelector('[name="' + key + '"][value="' + draft[key] + '"]');
+        if (match) match.checked = true;
+      } else {
+        field.value = draft[key];          // text, textarea, and <select>
+      }
+    });
+
+    // Re-sync derived UI that doesn't fire on programmatic changes:
+    SIDES.forEach(function (side) {
+      updateTotal(side); updateNameLabels(side); updateFocus(side);
+    });
+
+    // Re-sync judge "Other" state
+    var judgeSel = document.getElementById('judgeSelect');
+    var judgeOther = document.getElementById('judgeOther');
+    if (judgeSel.value === '__other__') {
+      judgeOther.style.display = '';
+      judgeOther.required = true;
+      if (draft.judgeOther) judgeOther.value = draft.judgeOther;
+    } else {
+      judgeOther.style.display = 'none';
+      judgeOther.required = false;
+    }
+
+    // Re-sync panel code state
+    var panelCheck = document.getElementById('panelRound');
+    var panelCodeInput = document.getElementById('panelCode');
+    if (panelCheck.checked) {
+      panelCodeInput.style.display = '';
+      if (draft.panelCode) panelCodeInput.value = draft.panelCode;
+    } else {
+      panelCodeInput.style.display = 'none';
+    }
+    // Focus answers restore LAST: updateFocus() clears the box when the question
+    // changes, so setting the text any earlier would wipe it.
+    SIDES.forEach(function (side) {
+      const area  = document.querySelector('[data-focus-side="' + side + '"] textarea');
+      const saved = draft[side + 'FocusResponse'];
+      if (area && !area.disabled && saved) area.value = saved;
+    });
+    refreshWinnerGlow();
+  }
+
+  function enableAutosave() {
+    if (autosaveOn) return;
+    autosaveOn = true;
+    const form = document.getElementById('ballot');
+    form.addEventListener('input', saveDraft);
+    form.addEventListener('change', saveDraft);
+  }
+
+  document.getElementById('restoreBtn').addEventListener('click', function () {
+    restoreDraft();
+    document.getElementById('draftBanner').style.display = 'none';
+    enableAutosave();
+    saveDraft();                            // persist the restored state immediately
+  });
+
+  document.getElementById('discardBtn').addEventListener('click', function () {
+    const entry = selectedDraft();
+    try {
+      if (entry && localStorage.getItem(entry.key) === entry.raw) localStorage.removeItem(entry.key);
+    } catch (err) { document.getElementById('status').textContent = 'Saved draft could not be discarded.'; }
+    showDraftChoices();
+    enableAutosave();
+  });
+
+  // Isolated page keys allow autosave even while recovery/roster is pending.
+  enableAutosave();
+
+  // Load competitor names (and practice focuses) from the JSON file.
+  fetch('roster.json?v=' + Date.now())
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      FOCUSES = data.focuses || {};
+
+      // Populate competitor dropdowns
+      document.querySelectorAll('.nameSelect').forEach(function (sel) {
+        data.competitors.forEach(function (name) {
+          let opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          sel.appendChild(opt);
+        });
+      });
+
+      // Populate judge dropdown from same roster + "Other Judge"
+      var judgeSel = document.getElementById('judgeSelect');
+      data.competitors.forEach(function (name) {
+        if (name === 'Other (please explain in RFD)') return;  // skip the competitor catch-all
+        var opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        judgeSel.appendChild(opt);
+      });
+      var otherOpt = document.createElement('option');
+      otherOpt.value = '__other__';
+      otherOpt.textContent = 'Other Judge';
+      judgeSel.appendChild(otherOpt);
+
+      SIDES.forEach(updateFocus);            // focuses are known now
+      // Roster is ready — now decide banner vs. straight-to-autosave:
+      if (readDraft()) {
+        showDraftChoices();
+      } else {
+        enableAutosave();
+      }
+    })
+    .catch(function () {
+      document.getElementById('status').textContent =
+        'Warning: could not load competitor list (roster.json).';
+      // Still offer the draft (names just won't refill without the roster):
+      if (readDraft()) {
+        showDraftChoices();
+      } else {
+        enableAutosave();
+      }
+    });
+
+  // Catch the same competitor being selected in two slots (easy to do with 4 dropdowns).
+  function duplicateName() {
+    const seen = {};
+    let dupe = null;
+    document.querySelectorAll('.nameSelect').forEach(function (sel) {
+      if (sel.disabled || !sel.value) return;
+      if (seen[sel.value]) dupe = sel.value;
+      seen[sel.value] = true;
+    });
+    return dupe;
+  }
+
+  // ---- CSV backup download ----
+  // Mirrors Code.gs headerRow() + buildRow() so the file matches the sheet exactly.
+  function csvEscape(v) {
+    var s = String(v == null ? '' : v);
+    if (/^[\s\u0000-\u001f]*[=+\-@]/.test(s)) s = "'" + s;
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function buildCsvRow(payload, sfx, speaker, roundId, stamp) {
+    var row = [stamp, roundId, payload.format || 'IPDA', speaker,
+               payload.judge, payload.date, payload.resolution];
+    ['aff', 'neg'].forEach(function (side) {
+      var p = side + sfx;
+      row.push(payload[p + 'Name'] || '');
+      CATEGORIES.forEach(function (c) { row.push(payload[p + c.key] || ''); });
+      row.push(payload[p + 'Total'] || '');
+    });
+    row.push(payload.winner, payload.lowPointWin, payload.initials,
+             payload['aff' + sfx + 'Liked']   || '', payload['aff' + sfx + 'Improve'] || '',
+             payload['neg' + sfx + 'Liked']   || '', payload['neg' + sfx + 'Improve'] || '',
+             payload.rfd || '',
+             payload['aff' + sfx + 'Focus'] || '', payload['aff' + sfx + 'FocusResponse'] || '',
+             payload['neg' + sfx + 'Focus'] || '', payload['neg' + sfx + 'FocusResponse'] || '',
+             panelKey(payload.panel));
+    return row.map(csvEscape).join(',');
+  }
+
+  function downloadCsv(payload, roundId) {
+    var header = ['Timestamp','Round ID','Format','Speaker',
+                  'Judge','Date','Resolution'];
+    ['Aff','Neg'].forEach(function (p) {
+      header.push(p + ' Name');
+      CATEGORIES.forEach(function (c) { header.push(p + ' ' + c.label); });
+      header.push(p + ' Points');
+    });
+    header = header.concat(['Winner','Low Point Win?',"Judge's Initials",
+      'Aff Liked Best','Aff Improve','Neg Liked Best','Neg Improve',
+      'Reason for Decision',
+      'Aff Focus','Aff Focus Response','Neg Focus','Neg Focus Response',
+      'Panel']);
+
+    var stamp = new Date().toISOString();
+    var lines = [header.map(csvEscape).join(',')];
+
+    if (payload.format === 'TIPDA') {
+      lines.push(buildCsvRow(payload, '',  '1', roundId, stamp));
+      lines.push(buildCsvRow(payload, '2', '2', roundId, stamp));
+    } else {
+      lines.push(buildCsvRow(payload, '',  '—', roundId, stamp));
+    }
+
+    var blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ballot_' + (roundId || 'unknown') + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+
+  function panelKey(value) {
+    const key = String(value == null ? '' : value).trim().toLowerCase();
+    return /^(yes|no|true|false)$/.test(key) ? '' : key;
+  }
+
+  function failureBackup(payload, status) {
+    try {
+      downloadCsv(payload, payload.submissionId);
+      status.textContent += ' — CSV backup download requested; keep your saved draft until reconciled.';
+    } catch (err) {
+      status.textContent += ' — CSV backup unavailable. Keep this form and saved draft; ask the coach to reconcile.';
+    }
+  }
+
+  // Submit handler.
+  document.getElementById('ballot').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (submitting) return;
+    const status = document.getElementById('status');
+
+    const dupe = duplicateName();
+    if (dupe) {
+      status.textContent = '⚠ ' + dupe + ' is selected in more than one speaker box.';
+      return;
+    }
+
+    status.textContent = 'Submitting…';
+
+    // Disabled (non-TIPDA, no-focus) fields are automatically excluded from FormData.
+    const payload = Object.fromEntries(new FormData(e.target).entries());
+    if (!submissionId) submissionId = newSubmissionId();
+    payload.submissionId = submissionId;
+    const submittedDraft = saveDraft(); // retain identity and exact snapshot until acknowledgement
+    if (!payload.lowPointWin) payload.lowPointWin = 'No';
+
+    // Panel: send the code string if checked, empty string if not.
+    // The code is normalized to lowercase+trimmed for matching.
+    var panelCode = panelKey(payload.panelCode);
+    payload.panel = document.getElementById('panelRound').checked ? panelCode : '';
+    delete payload.panelCheck;
+    delete payload.panelCode;
+
+    // Resolve judge name: use the typed name when "Other Judge" is selected
+    if (payload.judge === '__other__') {
+      payload.judge = payload.judgeOther || '';
+    }
+    delete payload.judgeOther;
+
+    payload.affTotal = updateTotal('aff');
+    payload.negTotal = updateTotal('neg');
+    if (isTipda()) {
+      payload.aff2Total = updateTotal('aff2');
+      payload.neg2Total = updateTotal('neg2');
+    }
+
+    setSubmitting(true);
+    let confirmed = false;
+    fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.result === 'success') {
+          confirmed = true; // local failures cannot undo a server acknowledgement
+          submissionId = '';
+          const warnings = [];
+          status.textContent = '✓ Ballot submitted!' +
+            (res.rows > 1 ? ' (' + res.rows + ' speaker entries)' : '');
+          if (document.getElementById('csvCopy').checked) {
+            try { downloadCsv(payload, res.roundId); }
+            catch (err) { warnings.push('CSV download unavailable'); }
+          }
+          try { clearSubmittedDraft(payload.submissionId, submittedDraft); }
+          catch (err) { warnings.push('saved draft could not be cleared; do not resubmit it'); }
+          draftKey = DRAFT_PREFIX + newSubmissionId();
+          recoverySource = null;
+          e.target.reset();
+          applyFormat();                    // reset() restores the default format
+          // Reset judge "Other" state
+          document.getElementById('judgeOther').style.display = 'none';
+          document.getElementById('judgeOther').required = false;
+          // Reset panel code state
+          document.getElementById('panelCode').style.display = 'none';
+          SIDES.forEach(function (side) {
+            updateTotal(side); updateNameLabels(side); updateFocus(side);
+          });
+          refreshWinnerGlow();              // clears the glow on all panels
+          document.querySelector('[name="date"]').value =
+            new Date().toISOString().slice(0, 10);
+          if (warnings.length) status.textContent += ' (' + warnings.join('; ') + ')';
+        } else {
+          status.textContent = 'Error: ' + res.message;
+          failureBackup(payload, status);
+        }
+      })
+      .catch(function (err) {
+        if (confirmed) {
+          status.textContent = '✓ Ballot submitted! Local form cleanup failed; do not resubmit this ballot.';
+          return;
+        }
+        status.textContent = 'Network error: ' + err;
+        failureBackup(payload, status);
+      })
+      .finally(function () { setSubmitting(false); });
+  });
+</script>
+</body>
+</html>
