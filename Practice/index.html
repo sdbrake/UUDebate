@@ -293,7 +293,7 @@
 </form>
 
 <script>
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOEI7UvSIMHOn3OYa5QQJzuap6ImcWBicyfutAdEV1Ox2DeSfxgjnKfRi6jJcH0xo7/exec";
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_Dc5ED9xRM69UubolDIIB0xDHP_-F0-9ed9IaVI-YpT/exec";
 
   // Every scoreable speaker slot. The "2" slots only apply to TIPDA.
   const SIDES = ['aff', 'neg', 'aff2', 'neg2'];
@@ -839,6 +839,13 @@
 
     // Disabled (non-TIPDA, no-focus) fields are automatically excluded from FormData.
     const payload = Object.fromEntries(new FormData(e.target).entries());
+    const panelChecked = document.getElementById('panelRound').checked;
+    const panelCode = panelKey(payload.panelCode);
+    if (panelChecked && !panelCode) {
+      status.textContent = 'Enter a shared panel code word—not Yes, No, True, or False.';
+      document.getElementById('panelCode').focus();
+      return; // keep the completed ballot available; do not send an unlinked panel
+    }
     if (!submissionId) submissionId = newSubmissionId();
     payload.submissionId = submissionId;
     const submittedDraft = saveDraft(); // retain identity and exact snapshot until acknowledgement
@@ -846,8 +853,7 @@
 
     // Panel: send the code string if checked, empty string if not.
     // The code is normalized to lowercase+trimmed for matching.
-    var panelCode = panelKey(payload.panelCode);
-    payload.panel = document.getElementById('panelRound').checked ? panelCode : '';
+    payload.panel = panelChecked ? panelCode : '';
     delete payload.panelCheck;
     delete payload.panelCode;
 
