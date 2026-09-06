@@ -110,7 +110,9 @@
 <h1>UU Debate Practice Ballot</h1>
 
 <div id="draftBanner">
-  <span>You have an unsaved ballot draft from a previous session.</span>
+  <span>Saved recovery drafts (other tabs may still be editing):
+    <select id="draftSelect" aria-label="Choose a saved ballot draft"></select>
+  </span>
   <span class="draftBtns">
     <button type="button" id="restoreBtn">Restore draft</button>
     <button type="button" id="discardBtn">Discard</button>
@@ -508,26 +510,96 @@
 
   // ---- Draft autosave + restore banner ----
   const DRAFT_KEY = 'bulldogBallotDraft';
+  const DRAFT_PREFIX = DRAFT_KEY + ':';
+  let draftKey = DRAFT_PREFIX + newSubmissionId(); // private to this page, even in duplicated tabs
+  let recoverySource = null;
   let autosaveOn = false;
+  let submissionId = '';
+  let submitting = false;
+
+  function newSubmissionId() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+  }
+
+  function setSubmitting(value) {
+    submitting = value;
+    document.querySelector('button[type="submit"]').disabled = value;
+  }
+
+  function draftEntries() {
+    const entries = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key !== DRAFT_KEY && !key.startsWith(DRAFT_PREFIX)) continue;
+        const raw = localStorage.getItem(key);
+        try {
+          const data = JSON.parse(raw);
+          if (data && typeof data === 'object') entries.push({ key, raw, data });
+        } catch (err) { /* Leave unreadable legacy recovery data untouched. */ }
+      }
+    } catch (err) { /* Storage unavailable. */ }
+    return entries;
+  }
+
+  function selectedDraft() {
+    const entries = draftEntries();
+    const selected = document.getElementById('draftSelect').value;
+    return selected ? (entries.find(entry => entry.key === selected) || null) : (entries[0] || null);
+  }
 
   function readDraft() {
-    try { return JSON.parse(localStorage.getItem(DRAFT_KEY)); }
-    catch (err) { return null; }
+    const entry = selectedDraft();
+    return entry ? entry.data : null;
+  }
+
+  function showDraftChoices() {
+    const select = document.getElementById('draftSelect');
+    select.textContent = '';
+    draftEntries().forEach(function (entry) {
+      const option = document.createElement('option');
+      option.value = entry.key;
+      option.textContent = [entry.data.date, entry.data.affName, entry.data.negName,
+        entry.data.submissionId || 'older draft'].filter(Boolean).join(' — ');
+      select.appendChild(option);
+    });
+    document.getElementById('draftBanner').style.display = readDraft() ? 'flex' : 'none';
+  }
+
+  function clearSubmittedDraft(id, raw) {
+    const saved = localStorage.getItem(draftKey);
+    if (saved === raw && JSON.parse(saved).submissionId === id) localStorage.removeItem(draftKey);
+    // A restored legacy/other-page snapshot is removed only if it is still unchanged.
+    if (recoverySource && localStorage.getItem(recoverySource.key) === recoverySource.raw &&
+        (!recoverySource.data.submissionId || recoverySource.data.submissionId === id)) {
+      localStorage.removeItem(recoverySource.key);
+    }
   }
 
   function saveDraft() {
+    if (!submissionId) submissionId = newSubmissionId();
     const draft = {};
     new FormData(document.getElementById('ballot')).forEach(function (value, key) {
       draft[key] = value;
     });
     draft.lowPointWin = document.getElementById('lpw').checked ? 'Yes' : '';
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); }
+    draft.submissionId = submissionId;
+    const raw = JSON.stringify(draft);
+    try { localStorage.setItem(draftKey, raw); }
     catch (err) { /* storage blocked/full (e.g. private mode) — fail silently */ }
+    return raw;
   }
 
   function restoreDraft() {
-    const draft = readDraft();
+    recoverySource = selectedDraft();
+    const draft = recoverySource ? recoverySource.data : null;
     if (!draft) return;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.submissionId || '')) submissionId = draft.submissionId;
 
     // Format first, so the TIPDA fields exist and are enabled before we fill them.
     if (draft.format) {
@@ -536,7 +608,7 @@
     }
 
     Object.keys(draft).forEach(function (key) {
-      if (key === 'format') return;
+      if (key === 'format' || key === 'submissionId') return;
       if (/Focus$|FocusResponse$/.test(key)) return;   // handled below
       const fields = document.querySelectorAll('[name="' + key + '"]');
       if (!fields.length) return;
@@ -603,10 +675,16 @@
   });
 
   document.getElementById('discardBtn').addEventListener('click', function () {
-    localStorage.removeItem(DRAFT_KEY);
-    document.getElementById('draftBanner').style.display = 'none';
+    const entry = selectedDraft();
+    try {
+      if (entry && localStorage.getItem(entry.key) === entry.raw) localStorage.removeItem(entry.key);
+    } catch (err) { document.getElementById('status').textContent = 'Saved draft could not be discarded.'; }
+    showDraftChoices();
     enableAutosave();
   });
+
+  // Isolated page keys allow autosave even while recovery/roster is pending.
+  enableAutosave();
 
   // Load competitor names (and practice focuses) from the JSON file.
   fetch('roster.json?v=' + Date.now())
@@ -641,7 +719,7 @@
       SIDES.forEach(updateFocus);            // focuses are known now
       // Roster is ready — now decide banner vs. straight-to-autosave:
       if (readDraft()) {
-        document.getElementById('draftBanner').style.display = 'flex';
+        showDraftChoices();
       } else {
         enableAutosave();
       }
@@ -651,7 +729,7 @@
         'Warning: could not load competitor list (roster.json).';
       // Still offer the draft (names just won't refill without the roster):
       if (readDraft()) {
-        document.getElementById('draftBanner').style.display = 'flex';
+        showDraftChoices();
       } else {
         enableAutosave();
       }
@@ -673,6 +751,7 @@
   // Mirrors Code.gs headerRow() + buildRow() so the file matches the sheet exactly.
   function csvEscape(v) {
     var s = String(v == null ? '' : v);
+    if (/^[\s\u0000-\u001f]*[=+\-@]/.test(s)) s = "'" + s;
     if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
     return s;
   }
@@ -692,7 +771,7 @@
              payload.rfd || '',
              payload['aff' + sfx + 'Focus'] || '', payload['aff' + sfx + 'FocusResponse'] || '',
              payload['neg' + sfx + 'Focus'] || '', payload['neg' + sfx + 'FocusResponse'] || '',
-             payload.panel || '');
+             panelKey(payload.panel));
     return row.map(csvEscape).join(',');
   }
 
@@ -730,9 +809,24 @@
     URL.revokeObjectURL(a.href);
   }
 
+  function panelKey(value) {
+    const key = String(value == null ? '' : value).trim().toLowerCase();
+    return /^(yes|no|true|false)$/.test(key) ? '' : key;
+  }
+
+  function failureBackup(payload, status) {
+    try {
+      downloadCsv(payload, payload.submissionId);
+      status.textContent += ' — CSV backup download requested; keep your saved draft until reconciled.';
+    } catch (err) {
+      status.textContent += ' — CSV backup unavailable. Keep this form and saved draft; ask the coach to reconcile.';
+    }
+  }
+
   // Submit handler.
   document.getElementById('ballot').addEventListener('submit', function (e) {
     e.preventDefault();
+    if (submitting) return;
     const status = document.getElementById('status');
 
     const dupe = duplicateName();
@@ -745,12 +839,15 @@
 
     // Disabled (non-TIPDA, no-focus) fields are automatically excluded from FormData.
     const payload = Object.fromEntries(new FormData(e.target).entries());
+    if (!submissionId) submissionId = newSubmissionId();
+    payload.submissionId = submissionId;
+    const submittedDraft = saveDraft(); // retain identity and exact snapshot until acknowledgement
     if (!payload.lowPointWin) payload.lowPointWin = 'No';
 
     // Panel: send the code string if checked, empty string if not.
     // The code is normalized to lowercase+trimmed for matching.
-    var panelCode = (payload.panelCode || '').trim().toLowerCase();
-    payload.panel = document.getElementById('panelRound').checked ? (panelCode || 'Yes') : '';
+    var panelCode = panelKey(payload.panelCode);
+    payload.panel = document.getElementById('panelRound').checked ? panelCode : '';
     delete payload.panelCheck;
     delete payload.panelCode;
 
@@ -767,16 +864,25 @@
       payload.neg2Total = updateTotal('neg2');
     }
 
+    setSubmitting(true);
+    let confirmed = false;
     fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (res.result === 'success') {
+          confirmed = true; // local failures cannot undo a server acknowledgement
+          submissionId = '';
+          const warnings = [];
           status.textContent = '✓ Ballot submitted!' +
             (res.rows > 1 ? ' (' + res.rows + ' speaker entries)' : '');
           if (document.getElementById('csvCopy').checked) {
-            downloadCsv(payload, res.roundId);
+            try { downloadCsv(payload, res.roundId); }
+            catch (err) { warnings.push('CSV download unavailable'); }
           }
-          localStorage.removeItem(DRAFT_KEY);
+          try { clearSubmittedDraft(payload.submissionId, submittedDraft); }
+          catch (err) { warnings.push('saved draft could not be cleared; do not resubmit it'); }
+          draftKey = DRAFT_PREFIX + newSubmissionId();
+          recoverySource = null;
           e.target.reset();
           applyFormat();                    // reset() restores the default format
           // Reset judge "Other" state
@@ -790,17 +896,21 @@
           refreshWinnerGlow();              // clears the glow on all panels
           document.querySelector('[name="date"]').value =
             new Date().toISOString().slice(0, 10);
+          if (warnings.length) status.textContent += ' (' + warnings.join('; ') + ')';
         } else {
-          status.textContent = 'Error: ' + res.message +
-            ' — downloading CSV backup…';
-          downloadCsv(payload, 'FAILED');
+          status.textContent = 'Error: ' + res.message;
+          failureBackup(payload, status);
         }
       })
       .catch(function (err) {
-        status.textContent = 'Network error: ' + err +
-          ' — downloading CSV backup…';
-        downloadCsv(payload, 'FAILED');
-      });
+        if (confirmed) {
+          status.textContent = '✓ Ballot submitted! Local form cleanup failed; do not resubmit this ballot.';
+          return;
+        }
+        status.textContent = 'Network error: ' + err;
+        failureBackup(payload, status);
+      })
+      .finally(function () { setSubmitting(false); });
   });
 </script>
 </body>
