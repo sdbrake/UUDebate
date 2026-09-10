@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Practice Resolutions</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Practice Resolutions</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* ---------- Base layout ---------- */
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px 0;
+      box-sizing: border-box;
+      font-family: 'Garamond', serif;
+      font-size: 1.5rem;
+      background-color: #fff;
+      color: #000;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+      border-bottom: 2px solid #2c5f8a;
+      padding-bottom: 6px;
+    }
+
+    /* #1 — Instruction line so the click-to-strike mechanic is discoverable */
+    .instructions {
+      font-size: 0.95rem;
+      color: #555;
+      max-width: 600px;
+      text-align: center;
+      margin: 0 0 16px;
+      line-height: 1.4;
+    }
+
+    /* #3 — Card structure for each resolution */
+    .line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      width: min(700px, 90%);
+      margin: 10px 0;
+      padding: 12px 16px;
+      background-color: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      box-sizing: border-box;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    /* #1 — Clickable text feedback */
+    .line p {
+      margin: 0;
+      flex: 1;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .line p:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    /* #7 — Visible keyboard focus on the clickable lines */
+    .line p:focus-visible {
+      outline: 2px solid #2c5f8a;
+      outline-offset: 2px;
+    }
+
+    .strikethrough {
+      text-decoration: line-through;
+      opacity: 0.4;
+    }
+
+    .highlight {
+      border-color: #ffcc00;
+      box-shadow: 0 0 0 2px #ffcc00, 0 4px 14px rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+      animation: pop 0.3s ease;
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+
+    /* #2 — Shared button / link-button styling */
+    button,
+    .button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #2c5f8a;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, transform 0.05s ease;
+    }
+
+    button:hover,
+    .button:hover {
+      background-color: #234c6e;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    /* #7 — Visible keyboard focus on buttons */
+    button:focus-visible,
+    .button:focus-visible {
+      outline: 2px solid #ffcc00;
+      outline-offset: 2px;
+    }
+
+    .button-container {
+      padding-top: 24px;
+    }
+
+    .footer-text {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #555;
+    }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 600px) {
+      body {
+        font-size: 1rem;
+      }
+
+      .line {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .line button {
+        align-self: flex-start;
+      }
+    }
+
+    /* ---------- 🌙 Dark Mode ---------- */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #1e1e1e;
+        color: #f5f5f5;
+      }
+
+      .instructions {
+        color: #bbb;
+      }
+
+      .line {
+        background-color: #2a2a2a;
+        border-color: #444;
+      }
+
+      .line p:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+      }
+
+      .line p:focus-visible {
+        outline-color: #7fb0d9;
+      }
+
+      .strikethrough {
+        opacity: 0.4;
+      }
+
+      .highlight {
+        border-color: #ffeb3b;
+        box-shadow: 0 0 0 2px #ffeb3b, 0 4px 14px rgba(0, 0, 0, 0.4);
+      }
+    }
+  </style>
+</head>
+
+<body id="body" data-resolution-backup="backup/index.html" data-resolution-backup-date="2026-09-10"><nav aria-label="Resolution practice" style="font:15px/1.5 Garamond,serif;margin:0 12px 12px"><a href="custom.html">Custom practice</a></nav>
+  <h1>Practice Resolutions</h1>
+
+  <!-- #1 — Tell users how the tool works -->
+  <p class="instructions">
+    Click a resolution to strike it. Hit <strong>Shuffle</strong> if you've debated one of these resolutions recently.
+  </p>
+
+  <script src="config.js"></script>
+  <script src="resolution-loader.js"></script>
+  <script>
+    // Normalize either "a bare string" or { text, tags } into a
+    // consistent { text, tags } object. This lets res.json hold a
+    // mix of old (string) and new (object) entries during migration.
+    function normalize(item) {
+      if (typeof item === 'string') {
+        return { text: item, tags: [] };
+      }
+      return { text: item.text, tags: item.tags || [] };
+    }
+
+    // Fetch the list from the JSON file
+    loadResolutions()
+      
+      .then(rawData => {
+        // Normalize, then drop anything tagged "exp" so it never gets pulled
+        var data = rawData
+          .map(normalize)
+          .filter(item => !item.tags.includes('exp'));
+
+        var body = document.getElementById('body');
+
+        // Limit the number of lines to the first 5 items in the list
+        var limit = Math.min(data.length, 5);
+
+        // Create a card with text + button for each of the first 5 items
+        for (var i = 0; i < limit; i++) {
+          var div = document.createElement('div');
+          div.className = 'line';
+
+          var p = document.createElement('p');
+          p.id = 'line' + (i + 1);
+          p.textContent = data[i].text;   // display the .text field
+
+          // #7 — Make the clickable text accessible (keyboard + screen reader)
+          p.setAttribute('role', 'button');
+          p.setAttribute('tabindex', '0');
+          p.setAttribute('aria-pressed', 'false');
+          p.setAttribute('aria-label', 'Toggle strike on: ' + data[i].text);
+
+          p.onclick = (function (p) {
+            return function () { strikeThrough(p.id); };
+          })(p);
+
+          // #7 — Activate with Enter or Space, like a real button
+          p.onkeydown = (function (p) {
+            return function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                strikeThrough(p.id);
+              }
+            };
+          })(p);
+
+          var button = document.createElement('button');
+          button.textContent = 'Shuffle';
+          button.setAttribute('aria-label', 'Shuffle this resolution');
+          button.onclick = (function (p) {
+            return function () { shuffleLine(p, data); };
+          })(p);
+
+          div.appendChild(p);
+          div.appendChild(button);
+
+          var buttonContainer = document.querySelector('.button-container');
+          body.insertBefore(div, buttonContainer);
+        }
+      });
+
+    // Re-evaluate the "last one left" highlight across all lines
+    function updateHighlight() {
+      var lines = document.getElementsByClassName('line');
+      var paragraphs = document.getElementsByTagName('p');
+
+      var unstruck = Array.from(paragraphs)
+        .filter(p => p.classList.contains('line') === false) // ignore .instructions etc.
+        .filter(p => p.closest('.line'))                     // only resolution lines
+        .filter(p => !p.classList.contains('strikethrough'));
+
+      // Clear all card highlights first
+      Array.from(lines).forEach(line => line.classList.remove('highlight'));
+
+      if (unstruck.length === 1) {
+        var card = unstruck[0].closest('.line');
+        if (card) card.classList.add('highlight');
+      }
+    }
+
+    function strikeThrough(id) {
+      var element = document.getElementById(id);
+      var struck = element.classList.toggle('strikethrough');
+      element.setAttribute('aria-pressed', struck ? 'true' : 'false'); // #7
+      updateHighlight();
+    }
+
+    function shuffleLine(p, data) {
+      // Copy the data array (array of { text, tags } objects)
+      var unusedLines = [...data];
+
+      // Remove the currently displayed lines from the candidate pool.
+      // Match on .text since the displayed paragraph holds only the text.
+      var paragraphs = document.querySelectorAll('.line p');
+      for (var i = 0; i < paragraphs.length; i++) {
+        var index = unusedLines.findIndex(item => item.text === paragraphs[i].textContent);
+        if (index > -1) {
+          unusedLines.splice(index, 1);
+        }
+      }
+
+      // If there are no unused lines, don't change the text
+      if (unusedLines.length === 0) {
+        return;
+      }
+
+      // Choose a random line from the unusedLines array
+      var randomIndex = Math.floor(Math.random() * unusedLines.length);
+      var newText = unusedLines[randomIndex].text;
+
+      // #5 — Smooth fade-out, swap, fade-in
+      p.style.opacity = '0';
+      setTimeout(function () {
+        p.textContent = newText;                    // display the .text field
+        p.setAttribute('aria-label', 'Toggle strike on: ' + newText); // #7
+        p.classList.remove('strikethrough');        // freshly shuffled-in starts clean
+        p.setAttribute('aria-pressed', 'false');    // #7
+        p.style.opacity = '1';
+        updateHighlight();                          // re-evaluate "last one left"
+      }, 150);
+    }
+  </script>
+
+  <div class="button-container">
+    <a href="https://forms.gle/hdpKTzJxdEEyC8BQ9" target="_blank" rel="noopener noreferrer" class="button">Suggest a Change</a>
+  </div>
+
+</body>
+
+</html>

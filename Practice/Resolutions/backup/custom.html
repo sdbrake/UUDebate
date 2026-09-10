@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Quick Strike Sheets by Type</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* ---------- Base layout ---------- */
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px 0;
+      box-sizing: border-box;
+      font-family: 'Garamond', serif;
+      font-size: 1.5rem;
+      background-color: #fff;
+      color: #000;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+      border-bottom: 2px solid #2c5f8a;
+      padding-bottom: 6px;
+      text-align: center;
+    }
+
+    /* #1 — Instruction line so the click-to-strike mechanic is discoverable */
+    .instructions {
+      font-size: 0.95rem;
+      color: #555;
+      max-width: 600px;
+      text-align: center;
+      margin: 0 0 16px;
+      line-height: 1.4;
+    }
+
+    /* ---------- Mode controls ---------- */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      font-size: 1rem;
+    }
+
+    .controls select {
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 7px 10px;
+      border: 1px solid #c4c4c4;
+      border-radius: 8px;
+      background-color: #fff;
+      color: #000;
+      cursor: pointer;
+    }
+
+    .controls select:focus-visible {
+      outline: 2px solid #2c5f8a;
+      outline-offset: 2px;
+    }
+
+    /* #3 — Card structure for each resolution */
+    .line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      width: min(700px, 90%);
+      margin: 10px 0;
+      padding: 12px 16px;
+      background-color: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      box-sizing: border-box;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    /* #1 — Clickable text feedback */
+    .line p {
+      margin: 0;
+      flex: 1;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 6px;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .line p:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    /* #7 — Visible keyboard focus on the clickable lines */
+    .line p:focus-visible {
+      outline: 2px solid #2c5f8a;
+      outline-offset: 2px;
+    }
+
+    .strikethrough {
+      text-decoration: line-through;
+      opacity: 0.4;
+    }
+
+    .highlight {
+      border-color: #ffcc00;
+      box-shadow: 0 0 0 2px #ffcc00, 0 4px 14px rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+      animation: pop 0.3s ease;
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+
+    /* #2 — Shared button / link-button styling */
+    button,
+    .button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #2c5f8a;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.15s ease, transform 0.05s ease;
+    }
+
+    button:hover,
+    .button:hover {
+      background-color: #234c6e;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    /* #7 — Visible keyboard focus on buttons */
+    button:focus-visible,
+    .button:focus-visible {
+      outline: 2px solid #ffcc00;
+      outline-offset: 2px;
+    }
+
+    .button-container {
+      padding-top: 24px;
+    }
+
+    .footer-text {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #555;
+    }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 600px) {
+      body {
+        font-size: 1rem;
+      }
+
+      .line {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .line button {
+        align-self: flex-start;
+      }
+    }
+
+    /* ---------- 🌙 Dark Mode ---------- */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #1e1e1e;
+        color: #f5f5f5;
+      }
+
+      .instructions {
+        color: #bbb;
+      }
+
+      .controls select {
+        background-color: #333;
+        color: #f5f5f5;
+        border: 1px solid #888;
+      }
+
+      .controls select:focus-visible {
+        outline-color: #7fb0d9;
+      }
+
+      .line {
+        background-color: #2a2a2a;
+        border-color: #444;
+      }
+
+      .line p:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+      }
+
+      .line p:focus-visible {
+        outline-color: #7fb0d9;
+      }
+
+      .strikethrough {
+        opacity: 0.4;
+      }
+
+      .highlight {
+        border-color: #ffeb3b;
+        box-shadow: 0 0 0 2px #ffeb3b, 0 4px 14px rgba(0, 0, 0, 0.4);
+      }
+    }
+  </style>
+</head>
+
+<body id="body"><aside role="note" style="box-sizing:border-box;width:min(800px,94%);margin:0 auto 18px;padding:12px;border:1px solid #c5ad63;background:#fff5cf;color:#44360f;font:15px/1.5 Georgia,serif"><strong>Static backup — saved 2026-09-10</strong><br>This page does not receive live publications. <a style="color:#254e70" href="../custom.html">Try the current practice page</a> · <a style="color:#254e70" href="index.html">Other backup practice mode</a></aside>
+  <h1>Quick Strike Sheets by Type</h1>
+
+  <!-- #1 — Tell users how the tool works -->
+  <p class="instructions">
+    Pick a <strong>Mode</strong> or click <strong>Redraw</strong> to draw a fresh sheet. Click a
+    resolution to strike it.
+  </p>
+
+  <div class="controls">
+    <label for="modeSelect">Mode:</label>
+    <select id="modeSelect">
+      <option value="balanced">Balanced</option>
+      <option value="all">All</option>
+      <option value="fac">Fact</option>
+      <option value="pol">Policy</option>
+      <option value="abs">Abstract</option>
+      <option value="val">Value</option>
+      <option value="exp">Experimental</option>
+    </select>
+    <button id="redrawBtn" type="button" aria-label="Redraw a fresh sheet">Redraw</button>
+  </div>
+
+  <script>
+    // Number of resolutions to display
+    var SLOTS = 5;
+
+    // Categories that must each appear at least once in "balanced" mode
+    var REQUIRED_TAGS = ['fac', 'pol', 'abs', 'val'];
+
+    // Full normalized dataset (set once after fetch), and the
+    // current per-line working pool (changes with the selected mode).
+    var allData = [];
+    var currentPool = [];
+
+    // Normalize either "a bare string" or { text, tags } into a
+    // consistent { text, tags } object. This lets res.json hold a
+    // mix of old (string) and new (object) entries during migration.
+    function normalize(item) {
+      if (typeof item === 'string') {
+        return { text: item, tags: [] };
+      }
+      return { text: item.text, tags: item.tags || [] };
+    }
+
+    // Fisher–Yates shuffle (returns a new array, leaves input untouched)
+    function shuffleArray(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = a[i];
+        a[i] = a[j];
+        a[j] = tmp;
+      }
+      return a;
+    }
+
+    // Balanced draw: one resolution per required category, then fill
+    // the remaining slot(s) randomly, then shuffle the final order.
+    function buildBalancedDraw(data) {
+      var chosen = [];
+      var usedTexts = new Set();
+
+      REQUIRED_TAGS.forEach(function (tag) {
+        var candidates = data.filter(function (item) {
+          return item.tags.includes(tag) && !usedTexts.has(item.text);
+        });
+        if (candidates.length > 0) {
+          var pick = candidates[Math.floor(Math.random() * candidates.length)];
+          chosen.push(pick);
+          usedTexts.add(pick.text);
+        }
+      });
+
+      var remainingPool = shuffleArray(
+        data.filter(function (item) { return !usedTexts.has(item.text); })
+      );
+      for (var i = 0; i < remainingPool.length && chosen.length < SLOTS; i++) {
+        chosen.push(remainingPool[i]);
+        usedTexts.add(remainingPool[i].text);
+      }
+
+      return shuffleArray(chosen).slice(0, SLOTS);
+    }
+
+    // Remove any previously rendered .line elements
+    function clearLines() {
+      var lines = document.querySelectorAll('.line');
+      for (var i = 0; i < lines.length; i++) {
+        lines[i].parentNode.removeChild(lines[i]);
+      }
+    }
+
+    // Render an array of { text, tags } items as interactive lines
+    function renderDraw(draw) {
+      clearLines();
+
+      var body = document.getElementById('body');
+      var buttonContainer = document.querySelector('.button-container');
+
+      for (var i = 0; i < draw.length; i++) {
+        var div = document.createElement('div');
+        div.className = 'line';
+
+        var p = document.createElement('p');
+        p.id = 'line' + (i + 1);
+        p.textContent = draw[i].text;
+
+        // #7 — Make the clickable text accessible (keyboard + screen reader)
+        p.setAttribute('role', 'button');
+        p.setAttribute('tabindex', '0');
+        p.setAttribute('aria-pressed', 'false');
+        p.setAttribute('aria-label', 'Toggle strike on: ' + draw[i].text);
+
+        p.onclick = (function (p) {
+          return function () { strikeThrough(p.id); };
+        })(p);
+
+        // #7 — Activate with Enter or Space, like a real button
+        p.onkeydown = (function (p) {
+          return function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              strikeThrough(p.id);
+            }
+          };
+        })(p);
+
+        var button = document.createElement('button');
+        button.textContent = 'Shuffle';
+        button.setAttribute('aria-label', 'Shuffle this resolution');
+        button.onclick = (function (p) {
+          return function () { shuffleLine(p); };
+        })(p);
+
+        div.appendChild(p);
+        div.appendChild(button);
+        body.insertBefore(div, buttonContainer);
+      }
+
+      updateHighlight();
+    }
+
+    // Apply the selected mode: set the working pool and draw fresh lines
+    function applyMode() {
+      var mode = document.getElementById('modeSelect').value;
+
+      // For every mode except "exp", work from a pool that excludes
+      // experimental topics. The "exp" mode flips that around.
+      var base = (mode === 'exp')
+        ? allData.filter(function (item) { return item.tags.includes('exp'); })
+        : allData.filter(function (item) { return !item.tags.includes('exp'); });
+
+      if (mode === 'balanced') {
+        currentPool = base;
+        renderDraw(buildBalancedDraw(base));
+      } else if (mode === 'all' || mode === 'exp') {
+        // "all" = every non-exp topic; "exp" = every exp topic.
+        currentPool = base;
+        renderDraw(shuffleArray(base).slice(0, SLOTS));
+      } else {
+        // Single-tag mode (fac/pol/abs/val): restrict the non-exp base.
+        currentPool = base.filter(function (item) {
+          return item.tags.includes(mode);
+        });
+        renderDraw(shuffleArray(currentPool).slice(0, SLOTS));
+      }
+    }
+
+    // Fetch the list from the JSON file
+    fetch('res.json')
+      .then(response => response.json())
+      .then(rawData => {
+        // Keep everything (including "exp"); modes decide what to exclude.
+        allData = rawData.map(normalize);
+
+        // Initial render uses the default mode (balanced)
+        applyMode();
+      });
+
+    // Wire up the controls
+    // Changing the mode does NOT redraw — it only takes effect when
+    // the user deliberately clicks "Redraw". This prevents accidental
+    // redraws while browsing the options.
+    document.getElementById('redrawBtn').addEventListener('click', applyMode);
+
+    // Re-evaluate the "last one left" highlight across all lines
+    function updateHighlight() {
+      var lines = document.getElementsByClassName('line');
+
+      var unstruck = Array.from(document.querySelectorAll('.line p'))
+        .filter(p => !p.classList.contains('strikethrough'));
+
+      // Clear all card highlights first
+      Array.from(lines).forEach(line => line.classList.remove('highlight'));
+
+      if (unstruck.length === 1) {
+        var card = unstruck[0].closest('.line');
+        if (card) card.classList.add('highlight');
+      }
+    }
+
+    function strikeThrough(id) {
+      var element = document.getElementById(id);
+      var struck = element.classList.toggle('strikethrough');
+      element.setAttribute('aria-pressed', struck ? 'true' : 'false'); // #7
+      updateHighlight();
+    }
+
+    // Per-line shuffle: pulls from the current mode's pool, excluding
+    // resolutions already displayed on the page.
+    function shuffleLine(p) {
+      var unusedLines = [...currentPool];
+
+      var paragraphs = document.querySelectorAll('.line p');
+      for (var i = 0; i < paragraphs.length; i++) {
+        var index = unusedLines.findIndex(item => item.text === paragraphs[i].textContent);
+        if (index > -1) {
+          unusedLines.splice(index, 1);
+        }
+      }
+
+      // If there are no unused lines, don't change the text
+      if (unusedLines.length === 0) {
+        return;
+      }
+
+      var randomIndex = Math.floor(Math.random() * unusedLines.length);
+      var newText = unusedLines[randomIndex].text;
+
+      // #5 — Smooth fade-out, swap, fade-in
+      p.style.opacity = '0';
+      setTimeout(function () {
+        p.textContent = newText;
+        p.setAttribute('aria-label', 'Toggle strike on: ' + newText); // #7
+        p.classList.remove('strikethrough');     // freshly shuffled-in starts clean
+        p.setAttribute('aria-pressed', 'false');  // #7
+        p.style.opacity = '1';
+        updateHighlight();
+      }, 150);
+    }
+  </script>
+
+  <div class="button-container">
+    <a href="https://forms.gle/hdpKTzJxdEEyC8BQ9" target="_blank" rel="noopener noreferrer" class="button">Suggest a Change</a>
+  </div>
+
+</body>
+
+</html>
