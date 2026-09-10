@@ -1,13 +1,18 @@
 /* Publication transport only. Draw and strike behavior stays in the pages. */
-function showBanner(message, type) {
+function showBanner(message, type, asFooter) {
   var node = document.getElementById('resolutionLoadStatus');
   if (!node) {
     node = document.createElement('div');
     node.id = 'resolutionLoadStatus';
     node.setAttribute('role', 'status');
-    node.style.cssText = 'padding:8px 16px;margin:8px auto;max-width:700px;text-align:center;font-size:0.9rem;';
-    document.getElementById('body').appendChild(node);
   }
+  // Successful publication details belong after the controls; errors stay prominent.
+  node.style.cssText = asFooter
+    ? 'box-sizing:border-box;width:min(700px,90%);padding:8px 12px;margin:24px auto 0;text-align:center;font-size:0.75rem;line-height:1.5;opacity:0.7;overflow-wrap:anywhere;'
+    : 'padding:8px 16px;margin:8px auto;max-width:700px;text-align:center;font-size:0.9rem;';
+  var body = document.getElementById('body');
+  if (asFooter) body.appendChild(node);
+  else body.insertBefore(node, document.querySelector('.line, .button-container'));
   node.className = 'banner banner-' + type;
   node.textContent = message;
   // Explicit opt-in recovery. Never silently substitute older resolutions.
@@ -80,7 +85,7 @@ async function loadResolutions() {
       return data;
     })();
     var data = await Promise.race([request, timeout]);
-    showBanner('Approved snapshot ' + data.version + ' · published ' + data.published, 'info');
+    showBanner('Approved snapshot ' + data.version + ' · published ' + data.published, 'info', true);
     return data.library;
   } catch (error) {
     if (config.allowStaleCache === true) {
