@@ -23,5 +23,11 @@
     "Samuel Jared",
     "Other (please explain in RFD)"
   ],
-  "focuses": {}
+  "focuses": {
+
+    "Lydia Stinnett": {
+      "label": "On Case",
+    "question": "How well did Lydia build up her own case and points?"
+    }
+  }
 }
