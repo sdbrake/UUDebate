@@ -25,13 +25,86 @@
   ],
   "focuses": {
 
-    "Lydia Stinnett": {
-      "label": "On Case",
-    "question": "How well did Lydia build up her own case and points?"
-    },
+
     "Daisy Murfey": {
       "label": "Logic",
     "question": "How well did Daisy explain her logic?"
+    },
+    "Eliana Snyder": {
+      "label": "Voter Quality",
+    "question": "How did Eliana boil the round down into a few key issues? Was it clear and effective?"
+    },
+        "Braeden Helmick": {
+      "label": "Hand gestures",
+    "question": "On a scale of 1-5, how distracted were you by Braeden's hand gestures? (Explain if distracted.)"
+    },
+        "Hailey Parker": {
+      "label": "On Case",
+    "question": "Is Hailey's case clear, effective, and the center of her argumentation?"
+    },
+        "Jonathan Manwaring": {
+      "label": "Time Management",
+    "question": "How well did Jonathan manage his time?"
+    },
+        "Samuel Jared": {
+      "label": "Cross-Examination",
+    "question": "How were Sam's questions during his cross-examination time?"
+    },
+        "Maycee Hufstedler": {
+      "label": "Delivery",
+    "question": "Give more details on Maycee's delivery. How could she continue to improve?"
+    },
+        "Lydia Stinnett": {
+      "label": "Case Time Management",
+    "question": "Is Lydia using her time well, and splitting her time between refutation and on-case?"
+    },
+        "Micah Laliberty": {
+      "label": "Cross-Examination",
+    "question": "How were Micah's cross-examination questions? What questions could he have asked that he did not ask?"
+    },
+        "Peyton Amicone": {
+      "label": "Clarity",
+    "question": "How organized is Peyton's argumentation, and how clearly tagged are her points?"
+    },
+        "Caleb Stubbs": {
+      "label": "Filler Words",
+    "question": "Did he have any filler words? Count them with a tally, if possible."
+    },
+        "Izzy Mejia-Aveledo": {
+      "label": "Refutation",
+    "question": "How is Izzy's refutation? Specifically, is she focusing on the right arguments during her rebuttal speeches?"
+    },
+        "Emily Adams": {
+      "label": "Structure",
+    "question": "Did Emily structure her case well? How would you have improved the structure? "
+    },
+        "Aben Hayes": {
+      "label": "Refutation",
+    "question": "Do you feel as if Aben covered every one of his opponent's arguments properly? Explain."
+    },
+        "Jake Leckrone": {
+      "label": "Cross Examinations",
+    "question": "How effectively did Jake use his CX time? "
+    },
+        "Michael McDonnell": {
+      "label": "Delivery",
+    "question": "What feedback would you like to give Michael on his delivery?"
+    },
+        "Bronson Gutierrez": {
+      "label": "Voter Quality",
+    "question": "How did Bronson boil the round down into a few key issues? Was it clear and effective?"
+    },
+        "Faith Atwater": {
+      "label": "Confidence",
+    "question": "On a scale from 1-10, how confident did Faith seem in her arguments? What would have made her seem more confident?"
+    },
+        "Anna La Pour": {
+      "label": "Refutation Tags",
+    "question": "Did Anna give good tags for her refutations and responses? Did she cover all her opponent's points?"
+    },
+        "Audrey Mae Taylor": {
+      "label": "Organization",
+    "question": "How easily were you able to flow Audrey's arguments? What could she have done to make it easier for you to flow?"
     }
   }
 }
