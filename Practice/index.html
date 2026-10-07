@@ -165,6 +165,8 @@
       <select name="affName" class="nameSelect" required>
         <option value="">-- select competitor --</option>
       </select>
+      <label for="affGuest">Guest name (optional, only when Other is selected)</label>
+      <input id="affGuest" name="affGuest" maxlength="150" placeholder="Leave blank for an anonymous guest; explain in RFD">
       <div class="catHolder" data-side="aff"></div>
       <div class="total">Total: <span id="affTotalDisplay">0</span> / 40</div>
     </fieldset>
@@ -177,6 +179,8 @@
       <select name="negName" class="nameSelect" required>
         <option value="">-- select competitor --</option>
       </select>
+      <label for="negGuest">Guest name (optional, only when Other is selected)</label>
+      <input id="negGuest" name="negGuest" maxlength="150" placeholder="Leave blank for an anonymous guest; explain in RFD">
       <div class="catHolder" data-side="neg"></div>
       <div class="total">Total: <span id="negTotalDisplay">0</span> / 40</div>
     </fieldset>
@@ -192,6 +196,8 @@
       <select name="aff2Name" class="nameSelect" required>
         <option value="">-- select competitor --</option>
       </select>
+      <label for="aff2Guest">Guest name (optional, only when Other is selected)</label>
+      <input id="aff2Guest" name="aff2Guest" maxlength="150" placeholder="Leave blank for an anonymous guest; explain in RFD">
       <div class="catHolder" data-side="aff2"></div>
       <div class="total">Total: <span id="aff2TotalDisplay">0</span> / 40</div>
     </fieldset>
@@ -204,6 +210,8 @@
       <select name="neg2Name" class="nameSelect" required>
         <option value="">-- select competitor --</option>
       </select>
+      <label for="neg2Guest">Guest name (optional, only when Other is selected)</label>
+      <input id="neg2Guest" name="neg2Guest" maxlength="150" placeholder="Leave blank for an anonymous guest; explain in RFD">
       <div class="catHolder" data-side="neg2"></div>
       <div class="total">Total: <span id="neg2TotalDisplay">0</span> / 40</div>
     </fieldset>
@@ -713,7 +721,7 @@
       });
       var otherOpt = document.createElement('option');
       otherOpt.value = '__other__';
-      otherOpt.textContent = 'Other Judge';
+      otherOpt.textContent = 'Other Judge (guest — no roster credit)';
       judgeSel.appendChild(otherOpt);
 
       SIDES.forEach(updateFocus);            // focuses are known now
@@ -736,13 +744,14 @@
     });
 
   // Catch the same competitor being selected in two slots (easy to do with 4 dropdowns).
-  function duplicateName() {
+  function duplicateName(payload) {
     const seen = {};
     let dupe = null;
-    document.querySelectorAll('.nameSelect').forEach(function (sel) {
-      if (sel.disabled || !sel.value) return;
-      if (seen[sel.value]) dupe = sel.value;
-      seen[sel.value] = true;
+    (payload.format === 'TIPDA' ? SIDES : ['aff', 'neg']).forEach(function (side) {
+      const value = String(payload[side + 'Name'] || '').trim().replace(/\s+/g, ' ').toLowerCase();
+      if (!value) return;
+      if (seen[value]) dupe = payload[side + 'Name'];
+      seen[value] = true;
     });
     return dupe;
   }
@@ -829,7 +838,16 @@
     if (submitting) return;
     const status = document.getElementById('status');
 
-    const dupe = duplicateName();
+    // Keep guest identity in the existing name columns, not a new sheet schema.
+    const payload = Object.fromEntries(new FormData(e.target).entries());
+    SIDES.forEach(function (side) {
+      const guest = String(payload[side + 'Guest'] || '').trim().replace(/\s+/g, ' ');
+      if (payload[side + 'Name'] === 'Other (please explain in RFD)' && guest) {
+        payload[side + 'Name'] = 'Guest: ' + guest;
+      }
+      delete payload[side + 'Guest'];
+    });
+    const dupe = duplicateName(payload);
     if (dupe) {
       status.textContent = '⚠ ' + dupe + ' is selected in more than one speaker box.';
       return;
@@ -838,7 +856,6 @@
     status.textContent = 'Submitting…';
 
     // Disabled (non-TIPDA, no-focus) fields are automatically excluded from FormData.
-    const payload = Object.fromEntries(new FormData(e.target).entries());
     const panelChecked = document.getElementById('panelRound').checked;
     const panelCode = panelKey(payload.panelCode);
     if (panelChecked && !panelCode) {
@@ -857,9 +874,10 @@
     delete payload.panelCheck;
     delete payload.panelCode;
 
-    // Resolve judge name: use the typed name when "Other Judge" is selected
+    // Other Judge explicitly records a guest, not a guessed roster alias.
     if (payload.judge === '__other__') {
-      payload.judge = payload.judgeOther || '';
+      const guestJudge = String(payload.judgeOther || '').trim().replace(/\s+/g, ' ');
+      payload.judge = guestJudge ? 'Guest: ' + guestJudge : '';
     }
     delete payload.judgeOther;
 
