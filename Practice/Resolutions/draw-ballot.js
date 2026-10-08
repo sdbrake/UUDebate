@@ -75,9 +75,9 @@
     panel.setAttribute('aria-labelledby', 'drawBallotHeading');
     panel.innerHTML = '<h2 id="drawBallotHeading">Selected resolution</h2>' +
       '<p id="drawBallotTopic"></p><p id="drawBallotStatus" role="status" aria-live="polite"></p>' +
-      '<button type="button" id="generateBallotCode">Generate Ballot Code</button>' +
-      '<div id="drawBallotResult" hidden><p>Ballot code: <strong><code id="drawBallotCode"></code></strong></p>' +
-      '<p class="draw-ballot-help">Give this code or link to your judge. Each judge completes a separate ballot.</p>' +
+      '<button type="button" id="generateBallotCode">Generate Round Code</button>' +
+      '<div id="drawBallotResult" hidden><p>Round code: <strong><code id="drawBallotCode"></code></strong></p>' +
+      '<p class="draw-ballot-help">Give this code or link to all judges of this debate. For a panel, select &ldquo;Panel round&rdquo; on each ballot; no second code is needed. Each judge completes a separate ballot.</p>' +
       '<label for="drawBallotLink">Ballot link</label><input id="drawBallotLink" type="text" readonly>' +
       '<div class="draw-ballot-actions"><button type="button" id="drawBallotCopy">Copy ballot link</button>' +
       '<a id="drawBallotOpen" class="button" target="_blank" rel="noopener noreferrer">Open ballot</a></div></div>' +
@@ -136,7 +136,7 @@
       el('drawBallotTopic').textContent = selected;
       el('generateBallotCode').disabled = state.busy || (!state.request && !current);
       el('generateBallotCode').hidden = !!state.draw;
-      el('generateBallotCode').textContent = state.busy ? 'Generating…' : state.request ? 'Retry code generation' : 'Generate Ballot Code';
+      el('generateBallotCode').textContent = state.busy ? 'Generating…' : state.request ? 'Retry code generation' : 'Generate Round Code';
       el('drawBallotNew').hidden = !state.request && !state.error;el('drawBallotNew').disabled = state.busy;
       el('drawBallotResult').hidden = !state.draw;
       el('drawBallotStatus').textContent = state.busy ? 'Saving this result… Keep this page open.' : state.error ||

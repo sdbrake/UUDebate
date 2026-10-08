@@ -142,12 +142,13 @@
         </select>
       </div>
     </div>
-    <label for="drawCodeInput">Finalized draw code (optional)</label>
+    <label for="drawCodeInput">Optional round code</label>
     <input id="drawCodeInput" placeholder="e.g. ABCD2345" autocomplete="off" autocapitalize="characters"
            aria-describedby="drawStatus">
-    <button type="button" id="loadDrawBtn">Load draw</button>
+    <button type="button" id="loadDrawBtn">Load draw / Retry</button>
+    <button type="button" id="manualRoundBtn" hidden>Use as a manual round code</button>
     <button type="button" id="detachDrawBtn" hidden>Remove link / enter manually</button>
-    <p id="drawStatus" role="status" aria-live="polite">Use a draw code to link the exact resolution. This is not a panel code.</p>
+    <p id="drawStatus" role="status" aria-live="polite">Load a saved draw to link its exact resolution. For multiple judges, check Panel round to share this round code.</p>
     <input type="hidden" name="drawId" value="">
     <input type="hidden" name="drawCode" value="">
     <label for="resolution">Resolution</label>
@@ -158,8 +159,7 @@
       <label for="panelRound" style="font-weight:normal;">
         <span class="tip" data-tip="Check this if more than one judge is scoring this round. All judges in the panel should enter the same code word so the system can match your ballots together.">Panel round (multiple judges)? ⓘ</span>
       </label>
-      <input name="panelCode" id="panelCode" placeholder="Shared code word (e.g. banana)"
-             style="display:none; margin-top:6px;">
+
     </div>
   </fieldset>
 
@@ -507,14 +507,7 @@
       }
     }
     if (e.target.id === 'panelRound') {
-      var codeInput = document.getElementById('panelCode');
-      if (e.target.checked) {
-        codeInput.style.display = '';
-        codeInput.focus();
-      } else {
-        codeInput.style.display = 'none';
-        codeInput.value = '';
-      }
+      if (e.target.checked) document.getElementById('drawCodeInput').focus();
     }
   });
 
@@ -533,12 +526,32 @@
   let submissionId = '';
   let submitting = false;
 
-  // Public finalized-draw lookup; never use the code as a ballot or panel identity.
+  // A single round code resolves either a saved draw or explicitly accepted manual grouping.
   const drawInput = document.getElementById('drawCodeInput');
   const drawStatus = document.getElementById('drawStatus');
   let linkedDraw = null;
   let drawRequest = 0;
   let drawPending = false;
+  let manualCode = '';
+  let recoveredPanel = '';
+  let manualCandidate = '';
+  const manualButton = document.getElementById('manualRoundBtn');
+  function clearManualCandidate() {
+    manualCandidate = '';
+    manualButton.hidden = true;
+  }
+  function offerManualCode() {
+    manualCandidate = drawInput.value;
+    manualButton.hidden = !manualCandidate.trim();
+    drawStatus.textContent = 'No saved draw for this code (generated draws use 8 characters). Choose Use as a manual round code, or correct the code and load again.';
+  }
+  manualButton.addEventListener('click', function () {
+    if (submitting || !manualCandidate || manualCandidate !== drawInput.value || linkedDraw) return;
+    manualCode = manualCandidate;
+    clearManualCandidate();
+    drawStatus.textContent = 'Manual round code accepted. Enter the resolution yourself; check Panel round to group judges.';
+    saveDraft();
+  });
 
   function cancelDrawLookup() {
     drawRequest++;
@@ -550,6 +563,9 @@
 
   function applyDrawLink(draw) {
     linkedDraw = draw;
+    manualCode = '';
+    recoveredPanel = '';
+    clearManualCandidate();
     document.querySelector('[name="drawId"]').value = draw ? draw.drawId : '';
     document.querySelector('[name="drawCode"]').value = draw ? draw.code : '';
     document.querySelector('[name="resolution"]').readOnly = !!draw;
@@ -568,16 +584,21 @@
     if (submitting) return;
     cancelDrawLookup();
     const request = drawRequest;
-    const code = drawInput.value.replace(/[\s-]/g, '').toUpperCase();
-    drawInput.value = code;
-    if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) {
-      drawStatus.textContent = 'Enter a valid 8-character draw code (no I, O, 0 or 1).';
-      return;
-    }
+    clearManualCandidate();
+    manualCode = '';
     if (linkedDraw) {
+      drawInput.value = linkedDraw.code;
       drawStatus.textContent = 'Remove the current draw link before loading another resolution.';
       return;
     }
+    const code = drawInput.value.replace(/[\s-]/g, '').toUpperCase();
+    if (/^[A-HJ-NP-Z2-9]{8}$/.test(code)) drawInput.value = code;
+    saveDraft(); // retry must not recover a previous manual acceptance
+    if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) {
+      offerManualCode();
+      return;
+    }
+    drawInput.value = code;
     if (document.querySelector('[name="resolution"]').value &&
         !(typeof window !== 'undefined' && typeof window.confirm === 'function' &&
           window.confirm('Replace the current resolution with this draw? Other ballot work will be kept.'))) {
@@ -593,7 +614,8 @@
       const result = await response.json();
       if (request !== drawRequest) return;
       if (result && result.result === 'error') {
-        drawStatus.textContent = 'Draw not loaded: ' + (typeof result.message === 'string' ? result.message : 'Unknown draw code.');
+        if (response.ok === true && result.message === 'Draw code not found.') offerManualCode();
+        else drawStatus.textContent = 'Could not load draw: the server did not confirm a saved draw. Use Load draw / Retry.';
         return;
       }
       if (!result || result.result !== 'success' || !validDraw(result.draw, code)) {
@@ -630,12 +652,26 @@
     return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
   }
 
+  let submittingControls = [];
   function setSubmitting(value) {
+    if (value === submitting) return;
+    if (value) {
+      // Keep the saved retry snapshot immutable: a pending POST must not accept
+      // edits that its success reset could erase. Retain prior disabled states.
+      const controls = new Set(Array.from(document.querySelectorAll('input, select, textarea, button')).filter(function (control) { return control.type !== 'hidden'; }));
+      controls.add(document.querySelector('button[type="submit"]'));
+      ['loadDrawBtn', 'detachDrawBtn', 'drawCodeInput', 'manualRoundBtn', 'panelRound', 'formatSelect', 'restoreBtn', 'discardBtn', 'draftSelect'].forEach(function (id) {
+        controls.add(document.getElementById(id));
+      });
+      submittingControls = Array.from(controls, function (control) {
+        return { control, disabled: control.disabled };
+      });
+      submittingControls.forEach(function (entry) { entry.control.disabled = true; });
+    } else {
+      submittingControls.forEach(function (entry) { entry.control.disabled = entry.disabled; });
+      submittingControls = [];
+    }
     submitting = value;
-    document.querySelector('button[type="submit"]').disabled = value;
-    ['loadDrawBtn', 'detachDrawBtn', 'drawCodeInput', 'restoreBtn', 'discardBtn', 'draftSelect'].forEach(function (id) {
-      document.getElementById(id).disabled = value;
-    });
   }
 
   function draftEntries() {
@@ -697,6 +733,12 @@
     });
     draft.lowPointWin = document.getElementById('lpw').checked ? 'Yes' : '';
     draft.submissionId = submissionId;
+    // Recovery-only metadata: not form controls, never part of the POST payload.
+    draft.roundCode = drawInput.value;
+    draft.roundCodeMode = linkedDraw ? 'linked' : (manualCode && manualCode === drawInput.value ? 'manual' : 'unresolved');
+    draft.roundCodeAccepted = draft.roundCodeMode === 'manual' ? manualCode : '';
+    draft.recoveredPanel = recoveredPanel;
+    draft.recoveredPanelDrawCode = recoveredPanel && linkedDraw ? linkedDraw.code : '';
     const raw = JSON.stringify(draft);
     try { localStorage.setItem(draftKey, raw); }
     catch (err) { /* storage blocked/full (e.g. private mode) — fail silently */ }
@@ -713,6 +755,7 @@
     applyDrawLink(null);
     drawInput.value = '';
 
+    document.getElementById('panelRound').checked = draft.panelCheck === 'Yes';
     // Format first, so the TIPDA fields exist and are enabled before we fill them.
     if (draft.format) {
       document.getElementById('formatSelect').value = draft.format;
@@ -738,9 +781,26 @@
     // Restore only the association stored with this exact recovered resolution.
     // The server remains authoritative and verifies it on submission.
     const recoveredDraw = { schemaVersion: 1, drawId: draft.drawId, code: draft.drawCode, resolution: draft.resolution };
-    if (validDraw(recoveredDraw, draft.drawCode)) {
+    const modern = Object.prototype.hasOwnProperty.call(draft, 'roundCode');
+    drawInput.value = modern && typeof draft.roundCode === 'string' ? draft.roundCode : '';
+    if (validDraw(recoveredDraw, draft.drawCode) &&
+        (!modern || (draft.roundCodeMode === 'linked' && draft.roundCode === draft.drawCode))) {
       applyDrawLink(recoveredDraw);
       drawInput.value = draft.drawCode;
+      // Older failed submissions may group a linked draw under a DIFFERENT panel key.
+      // Preserve that exact retry identity, without exposing a second editable field.
+      recoveredPanel = !modern ? panelKey(draft.panelCode) :
+        (draft.recoveredPanelDrawCode === draft.drawCode ? panelKey(draft.recoveredPanel) : '');
+      if (recoveredPanel) drawStatus.textContent += ' Recovery: original panel grouping "' + recoveredPanel + '" retained for retries. Unchecking Panel round sends no grouping; removing the link clears this legacy grouping.';
+    } else if (modern && draft.roundCodeMode === 'manual' && drawInput.value.trim() &&
+               draft.roundCodeAccepted === drawInput.value) {
+      manualCode = drawInput.value;
+      drawStatus.textContent = 'Recovered accepted manual round code. No saved draw linked.';
+    } else if (!modern && typeof draft.panelCode === 'string' && draft.panelCode.trim()) {
+      drawInput.value = manualCode = draft.panelCode;
+      drawStatus.textContent = 'Recovered existing manual round code. No draw linked; original grouping and submission identity retained.';
+    } else if (drawInput.value.trim()) {
+      drawStatus.textContent = 'Recovered unresolved round code. Use Load draw / Retry before submitting, or clear the code.';
     }
 
     // Re-sync derived UI that doesn't fire on programmatic changes:
@@ -760,15 +820,7 @@
       judgeOther.required = false;
     }
 
-    // Re-sync panel code state
-    var panelCheck = document.getElementById('panelRound');
-    var panelCodeInput = document.getElementById('panelCode');
-    if (panelCheck.checked) {
-      panelCodeInput.style.display = '';
-      if (draft.panelCode) panelCodeInput.value = draft.panelCode;
-    } else {
-      panelCodeInput.style.display = 'none';
-    }
+
     // Focus answers restore LAST: updateFocus() clears the box when the question
     // changes, so setting the text any earlier would wipe it.
     SIDES.forEach(function (side) {
@@ -783,7 +835,16 @@
     if (autosaveOn) return;
     autosaveOn = true;
     const form = document.getElementById('ballot');
-    function onEdit() { cancelDrawLookup(); saveDraft(); }
+    function onEdit(e) {
+      if (submitting) return;
+      cancelDrawLookup();
+      clearManualCandidate();
+      if (e.target === drawInput) {
+        manualCode = '';
+        if (linkedDraw) drawInput.value = linkedDraw.code;
+      }
+      saveDraft();
+    }
     form.addEventListener('input', onEdit);
     form.addEventListener('change', onEdit);
   }
@@ -981,6 +1042,11 @@
     }
 
     // Keep guest identity in the existing name columns, not a new sheet schema.
+    if (drawInput.value.trim() && !linkedDraw && manualCode !== drawInput.value) {
+      status.textContent = 'Resolve the round code first: Load draw / Retry, explicitly accept a manual round code, or clear the code.';
+      drawInput.focus();
+      return;
+    }
     const payload = Object.fromEntries(new FormData(e.target).entries());
     SIDES.forEach(function (side) {
       const guest = String(payload[side + 'Guest'] || '').trim().replace(/\s+/g, ' ');
@@ -999,10 +1065,10 @@
 
     // Disabled (non-TIPDA, no-focus) fields are automatically excluded from FormData.
     const panelChecked = document.getElementById('panelRound').checked;
-    const panelCode = panelKey(payload.panelCode);
+    const panelCode = panelKey(linkedDraw ? (recoveredPanel || linkedDraw.code) : drawInput.value);
     if (panelChecked && !panelCode) {
       status.textContent = 'Enter a shared panel code word—not Yes, No, True, or False.';
-      document.getElementById('panelCode').focus();
+      drawInput.focus();
       return; // keep the completed ballot available; do not send an unlinked panel
     }
     if (!submissionId) submissionId = newSubmissionId();
@@ -1037,6 +1103,7 @@
       .then(function (res) {
         if (res.result === 'success') {
           confirmed = true; // local failures cannot undo a server acknowledgement
+          setSubmitting(false); // restore old states before reset applies the new format/focus states
           submissionId = '';
           const warnings = [];
           status.textContent = '✓ Ballot submitted!' +
@@ -1057,8 +1124,6 @@
           // Reset judge "Other" state
           document.getElementById('judgeOther').style.display = 'none';
           document.getElementById('judgeOther').required = false;
-          // Reset panel code state
-          document.getElementById('panelCode').style.display = 'none';
           SIDES.forEach(function (side) {
             updateTotal(side); updateNameLabels(side); updateFocus(side);
           });
