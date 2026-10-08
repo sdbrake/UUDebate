@@ -142,8 +142,16 @@
         </select>
       </div>
     </div>
-    <label>Resolution</label>
-    <input name="resolution" required>
+    <label for="drawCodeInput">Finalized draw code (optional)</label>
+    <input id="drawCodeInput" placeholder="e.g. ABCD2345" autocomplete="off" autocapitalize="characters"
+           aria-describedby="drawStatus">
+    <button type="button" id="loadDrawBtn">Load draw</button>
+    <button type="button" id="detachDrawBtn" hidden>Remove link / enter manually</button>
+    <p id="drawStatus" role="status" aria-live="polite">Use a draw code to link the exact resolution. This is not a panel code.</p>
+    <input type="hidden" name="drawId" value="">
+    <input type="hidden" name="drawCode" value="">
+    <label for="resolution">Resolution</label>
+    <input id="resolution" name="resolution" required>
 
     <div class="lowpoint" style="margin-top:10px;">
       <input type="checkbox" id="panelRound" name="panelCheck" value="Yes">
@@ -525,6 +533,94 @@
   let submissionId = '';
   let submitting = false;
 
+  // Public finalized-draw lookup; never use the code as a ballot or panel identity.
+  const drawInput = document.getElementById('drawCodeInput');
+  const drawStatus = document.getElementById('drawStatus');
+  let linkedDraw = null;
+  let drawRequest = 0;
+  let drawPending = false;
+
+  function cancelDrawLookup() {
+    drawRequest++;
+    if (drawPending) drawStatus.textContent = 'Draw lookup cancelled because the ballot changed. Load again when ready.';
+    drawPending = false;
+    document.getElementById('detachDrawBtn').hidden = !linkedDraw;
+  }
+  // Input cancellation is combined with autosave below so both always run.
+
+  function applyDrawLink(draw) {
+    linkedDraw = draw;
+    document.querySelector('[name="drawId"]').value = draw ? draw.drawId : '';
+    document.querySelector('[name="drawCode"]').value = draw ? draw.code : '';
+    document.querySelector('[name="resolution"]').readOnly = !!draw;
+    document.getElementById('detachDrawBtn').hidden = !draw;
+    drawStatus.textContent = draw ? 'Linked draw ' + draw.code + '. Remove the link before editing the resolution.' : 'Manual resolution entry. No draw linked.';
+  }
+
+  function validDraw(draw, code) {
+    return draw && draw.schemaVersion === 1 && draw.code === code &&
+      /^[A-HJ-NP-Z2-9]{8}$/.test(draw.code) &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draw.drawId || '') &&
+      typeof draw.resolution === 'string' && draw.resolution.trim().length > 0;
+  }
+
+  async function loadDraw() {
+    if (submitting) return;
+    cancelDrawLookup();
+    const request = drawRequest;
+    const code = drawInput.value.replace(/[\s-]/g, '').toUpperCase();
+    drawInput.value = code;
+    if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) {
+      drawStatus.textContent = 'Enter a valid 8-character draw code (no I, O, 0 or 1).';
+      return;
+    }
+    if (linkedDraw) {
+      drawStatus.textContent = 'Remove the current draw link before loading another resolution.';
+      return;
+    }
+    if (document.querySelector('[name="resolution"]').value &&
+        !(typeof window !== 'undefined' && typeof window.confirm === 'function' &&
+          window.confirm('Replace the current resolution with this draw? Other ballot work will be kept.'))) {
+      drawStatus.textContent = 'Current resolution kept. No draw loaded.';
+      return;
+    }
+    drawPending = true;
+    document.getElementById('detachDrawBtn').hidden = false;
+    drawStatus.textContent = 'Loading draw…';
+    try {
+      const response = await fetch(SCRIPT_URL + '?action=draw.lookup&code=' + encodeURIComponent(code));
+      if (response.ok === false) throw new Error('HTTP error');
+      const result = await response.json();
+      if (request !== drawRequest) return;
+      if (result && result.result === 'error') {
+        drawStatus.textContent = 'Draw not loaded: ' + (typeof result.message === 'string' ? result.message : 'Unknown draw code.');
+        return;
+      }
+      if (!result || result.result !== 'success' || !validDraw(result.draw, code)) {
+        drawStatus.textContent = 'Invalid draw response. No link changed.';
+        return;
+      }
+      document.querySelector('[name="resolution"]').value = result.draw.resolution;
+      applyDrawLink(result.draw);
+      saveDraft();
+    } catch (err) {
+      if (request === drawRequest) drawStatus.textContent = 'Could not load draw. Check your connection and try again.';
+    } finally {
+      if (request === drawRequest) {
+        drawPending = false;
+        document.getElementById('detachDrawBtn').hidden = !linkedDraw;
+      }
+    }
+  }
+  document.getElementById('loadDrawBtn').addEventListener('click', function () { loadDraw(); });
+  document.getElementById('detachDrawBtn').addEventListener('click', function () {
+    if (submitting) return;
+    cancelDrawLookup();
+    applyDrawLink(null);
+    drawInput.value = '';
+    saveDraft();
+  });
+
   function newSubmissionId() {
     if (crypto.randomUUID) return crypto.randomUUID();
     const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -537,6 +633,9 @@
   function setSubmitting(value) {
     submitting = value;
     document.querySelector('button[type="submit"]').disabled = value;
+    ['loadDrawBtn', 'detachDrawBtn', 'drawCodeInput', 'restoreBtn', 'discardBtn', 'draftSelect'].forEach(function (id) {
+      document.getElementById(id).disabled = value;
+    });
   }
 
   function draftEntries() {
@@ -544,6 +643,7 @@
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
+        if (key === draftKey) continue; // this page's active autosave is not recovered work
         if (key !== DRAFT_KEY && !key.startsWith(DRAFT_PREFIX)) continue;
         const raw = localStorage.getItem(key);
         try {
@@ -607,7 +707,11 @@
     recoverySource = selectedDraft();
     const draft = recoverySource ? recoverySource.data : null;
     if (!draft) return;
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.submissionId || '')) submissionId = draft.submissionId;
+    cancelDrawLookup();
+    submissionId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.submissionId || '')
+      ? draft.submissionId : newSubmissionId();
+    applyDrawLink(null);
+    drawInput.value = '';
 
     // Format first, so the TIPDA fields exist and are enabled before we fill them.
     if (draft.format) {
@@ -616,7 +720,7 @@
     }
 
     Object.keys(draft).forEach(function (key) {
-      if (key === 'format' || key === 'submissionId') return;
+      if (key === 'format' || key === 'submissionId' || key === 'drawId' || key === 'drawCode') return;
       if (/Focus$|FocusResponse$/.test(key)) return;   // handled below
       const fields = document.querySelectorAll('[name="' + key + '"]');
       if (!fields.length) return;
@@ -630,6 +734,14 @@
         field.value = draft[key];          // text, textarea, and <select>
       }
     });
+
+    // Restore only the association stored with this exact recovered resolution.
+    // The server remains authoritative and verifies it on submission.
+    const recoveredDraw = { schemaVersion: 1, drawId: draft.drawId, code: draft.drawCode, resolution: draft.resolution };
+    if (validDraw(recoveredDraw, draft.drawCode)) {
+      applyDrawLink(recoveredDraw);
+      drawInput.value = draft.drawCode;
+    }
 
     // Re-sync derived UI that doesn't fire on programmatic changes:
     SIDES.forEach(function (side) {
@@ -671,11 +783,13 @@
     if (autosaveOn) return;
     autosaveOn = true;
     const form = document.getElementById('ballot');
-    form.addEventListener('input', saveDraft);
-    form.addEventListener('change', saveDraft);
+    function onEdit() { cancelDrawLookup(); saveDraft(); }
+    form.addEventListener('input', onEdit);
+    form.addEventListener('change', onEdit);
   }
 
   document.getElementById('restoreBtn').addEventListener('click', function () {
+    if (submitting) return;
     restoreDraft();
     document.getElementById('draftBanner').style.display = 'none';
     enableAutosave();
@@ -683,6 +797,7 @@
   });
 
   document.getElementById('discardBtn').addEventListener('click', function () {
+    if (submitting) return;
     const entry = selectedDraft();
     try {
       if (entry && localStorage.getItem(entry.key) === entry.raw) localStorage.removeItem(entry.key);
@@ -693,6 +808,29 @@
 
   // Isolated page keys allow autosave even while recovery/roster is pending.
   enableAutosave();
+
+  // URL prefill is only automatic when there is no recovery work at all, including
+  // unreadable older drafts. Manual Load remains available without deleting them.
+  function hasRecoveryWork() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key === DRAFT_KEY || key.startsWith(DRAFT_PREFIX)) return true;
+      }
+      return false;
+    } catch (err) { return true; } // unavailable storage cannot prove a pristine page
+  }
+  if (typeof window !== 'undefined' && window.location && typeof URLSearchParams !== 'undefined') {
+    const urlCode = new URLSearchParams(window.location.search).get('draw');
+    if (urlCode !== null) {
+      drawInput.value = urlCode.replace(/[\s-]/g, '').toUpperCase();
+      if (hasRecoveryWork()) {
+        drawStatus.textContent = 'Saved recovery work found. Restore it first, or choose Load draw for this new ballot.';
+      } else {
+        loadDraw();
+      }
+    }
+  }
 
   // Load competitor names (and practice focuses) from the JSON file.
   fetch('roster.json?v=' + Date.now())
@@ -837,6 +975,10 @@
     e.preventDefault();
     if (submitting) return;
     const status = document.getElementById('status');
+    if (drawPending) {
+      status.textContent = 'Wait for the draw lookup, or cancel it before submitting.';
+      return;
+    }
 
     // Keep guest identity in the existing name columns, not a new sheet schema.
     const payload = Object.fromEntries(new FormData(e.target).entries());
@@ -908,6 +1050,9 @@
           draftKey = DRAFT_PREFIX + newSubmissionId();
           recoverySource = null;
           e.target.reset();
+          cancelDrawLookup();
+          applyDrawLink(null); // hidden-input values survive native reset unless explicitly cleared
+          drawInput.value = '';
           applyFormat();                    // reset() restores the default format
           // Reset judge "Other" state
           document.getElementById('judgeOther').style.display = 'none';

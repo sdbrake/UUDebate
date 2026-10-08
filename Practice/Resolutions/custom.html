@@ -369,6 +369,7 @@
 
     // Apply the selected mode: set the working pool and draw fresh lines
     function applyMode() {
+      if (typeof DrawBallot !== 'undefined' && !DrawBallot.canEdit() && document.querySelector('.line p')) return;
       var mode = document.getElementById('modeSelect').value;
 
       // For every mode except "exp", work from a pool that excludes
@@ -424,9 +425,11 @@
         var card = unstruck[0].closest('.line');
         if (card) card.classList.add('highlight');
       }
+      if (typeof DrawBallot !== 'undefined') DrawBallot.refresh();
     }
 
     function strikeThrough(id) {
+      if (typeof DrawBallot !== 'undefined' && !DrawBallot.canEdit()) return;
       var element = document.getElementById(id);
       var struck = element.classList.toggle('strikethrough');
       element.setAttribute('aria-pressed', struck ? 'true' : 'false'); // #7
@@ -436,6 +439,7 @@
     // Per-line shuffle: pulls from the current mode's pool, excluding
     // resolutions already displayed on the page.
     function shuffleLine(p) {
+      if (typeof DrawBallot !== 'undefined' && !DrawBallot.canEdit()) return;
       var unusedLines = [...currentPool];
 
       var paragraphs = document.querySelectorAll('.line p');
@@ -471,6 +475,7 @@
     <a href="https://forms.gle/hdpKTzJxdEEyC8BQ9" target="_blank" rel="noopener noreferrer" class="button">Suggest a Change</a>
   </div>
 
+  <script src="draw-ballot.js?v=1" data-source="custom" data-ballot-endpoint="https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_Dc5ED9xRM69UubolDIIB0xDHP_-F0-9ed9IaVI-YpT/exec"></script>
 </body>
 
 </html>

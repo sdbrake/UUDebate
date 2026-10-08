@@ -265,6 +265,7 @@
           var buttonContainer = document.querySelector('.button-container');
           body.insertBefore(div, buttonContainer);
         }
+        if (typeof DrawBallot !== 'undefined') DrawBallot.refresh();
       });
 
     // Re-evaluate the "last one left" highlight across all lines
@@ -284,9 +285,11 @@
         var card = unstruck[0].closest('.line');
         if (card) card.classList.add('highlight');
       }
+      if (typeof DrawBallot !== 'undefined') DrawBallot.refresh();
     }
 
     function strikeThrough(id) {
+      if (typeof DrawBallot !== 'undefined' && !DrawBallot.canEdit()) return;
       var element = document.getElementById(id);
       var struck = element.classList.toggle('strikethrough');
       element.setAttribute('aria-pressed', struck ? 'true' : 'false'); // #7
@@ -294,6 +297,7 @@
     }
 
     function shuffleLine(p, data) {
+      if (typeof DrawBallot !== 'undefined' && !DrawBallot.canEdit()) return;
       // Copy the data array (array of { text, tags } objects)
       var unusedLines = [...data];
 
@@ -333,6 +337,7 @@
     <a href="https://forms.gle/hdpKTzJxdEEyC8BQ9" target="_blank" rel="noopener noreferrer" class="button">Suggest a Change</a>
   </div>
 
+  <script src="draw-ballot.js?v=1" data-source="practice" data-ballot-endpoint="https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_Dc5ED9xRM69UubolDIIB0xDHP_-F0-9ed9IaVI-YpT/exec"></script>
 </body>
 
 </html>
