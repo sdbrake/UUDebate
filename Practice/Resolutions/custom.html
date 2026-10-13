@@ -241,9 +241,12 @@
       <option value="abs">Abstract</option>
       <option value="val">Value</option>
       <option value="exp">Experimental</option>
+      <option value="middle-earth">Middle Earth</option>
     </select>
     <button id="redrawBtn" type="button" aria-label="Redraw a fresh sheet">Redraw</button>
   </div>
+
+  <p id="middleEarthStatus" class="instructions" role="status" aria-live="polite" hidden></p>
 
   <script src="config.js"></script>
   <script src="resolution-loader.js"></script>
@@ -258,6 +261,8 @@
     // current per-line working pool (changes with the selected mode).
     var allData = [];
     var currentPool = [];
+    var drawGeneration = 0;
+    var appliedMode = null;
 
     // Normalize either "a bare string" or { text, tags } into a
     // consistent { text, tags } object. This lets res.json hold a
@@ -367,10 +372,70 @@
       updateHighlight();
     }
 
+    // Special collections never enter the ordinary publication dataset.
+    function validateMiddleEarth(data) {
+      if (!Array.isArray(data) || data.length < SLOTS || data.length > 20000) {
+        throw Error('Invalid Middle Earth collection');
+      }
+      var seen = new Set();
+      data.forEach(function (item) {
+        if (!item || Object.keys(item).sort().join(',') !== 'tags,text' ||
+            typeof item.text !== 'string' || !item.text.trim() || item.text.length > 20000 ||
+            seen.has(item.text) || !Array.isArray(item.tags) || !item.tags.includes('tolkien') ||
+            item.tags.some(function (tag) { return !['fac', 'pol', 'abs', 'val', 'exp', 'tolkien'].includes(tag); })) {
+          throw Error('Invalid Middle Earth resolution');
+        }
+        seen.add(item.text);
+      });
+      return data;
+    }
+
+    function middleEarthStatus(message) {
+      var status = document.getElementById('middleEarthStatus');
+      status.textContent = message;
+      status.hidden = !message;
+    }
+
     // Apply the selected mode: set the working pool and draw fresh lines
-    function applyMode() {
+    function applyMode(initialMode) {
       if (typeof DrawBallot !== 'undefined' && !DrawBallot.canEdit() && document.querySelector('.line p')) return;
-      var mode = document.getElementById('modeSelect').value;
+      var generation = ++drawGeneration;
+      var mode = typeof initialMode === 'string' ? initialMode : document.getElementById('modeSelect').value;
+      appliedMode = mode;
+      middleEarthStatus('');
+      if (mode === 'middle-earth') {
+        currentPool = [];
+        clearLines();
+        updateHighlight();
+        middleEarthStatus('Loading Middle Earth resolutions…');
+        var controller = new AbortController();
+        var timer;
+        var timeout = new Promise(function (_, reject) {
+          timer = setTimeout(function () {
+            controller.abort();
+            reject(Error('Middle Earth request timed out'));
+          }, 15000);
+        });
+        var request = fetch('middle-earth.json', {cache: 'no-store', credentials: 'omit', signal: controller.signal})
+          .then(function (response) {
+            if (!response.ok) throw Error('HTTP ' + response.status);
+            return response.json();
+          })
+          .then(validateMiddleEarth);
+        return Promise.race([request, timeout])
+          .then(function (data) {
+            if (generation !== drawGeneration) return;
+            currentPool = data;
+            middleEarthStatus('');
+            renderDraw(shuffleArray(currentPool).slice(0, SLOTS));
+          })
+          .catch(function () {
+            if (generation !== drawGeneration) return;
+            middleEarthStatus('Unable to load Middle Earth resolutions. Click Redraw to retry or choose another mode.');
+          })
+          .finally(function () { clearTimeout(timer); });
+      }
+
 
       // For every mode except "exp", work from a pool that excludes
       // experimental topics. The "exp" mode flips that around.
@@ -401,8 +466,9 @@
         // Keep everything (including "exp"); modes decide what to exclude.
         allData = rawData.map(normalize);
 
-        // Initial render uses the default mode (balanced)
-        applyMode();
+        // A late ordinary feed must not reset an explicitly redrawn special sheet.
+        if (drawGeneration === 0) applyMode('balanced');
+        else if (appliedMode !== 'middle-earth') applyMode(appliedMode);
       });
 
     // Wire up the controls
@@ -459,8 +525,10 @@
       var newText = unusedLines[randomIndex].text;
 
       // #5 — Smooth fade-out, swap, fade-in
+      var generation = drawGeneration;
       p.style.opacity = '0';
       setTimeout(function () {
+        if (generation !== drawGeneration || !p.isConnected) return;
         p.textContent = newText;
         p.setAttribute('aria-label', 'Toggle strike on: ' + newText); // #7
         p.classList.remove('strikethrough');     // freshly shuffled-in starts clean
