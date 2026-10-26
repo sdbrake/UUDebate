@@ -274,9 +274,22 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
     }
     var ballots = [], selected = '';
     var panel = document.getElementById('ballotsPanel');
-    panel.insertAdjacentHTML('beforeend', '<div class="filters"><label>Source<select id="sourceFilter"><option value="">All sources</option><option value="practice">Practice</option><option value="tournament">Tournament</option></select></label><label>Event<select id="eventFilter"><option value="">All events</option></select></label><label class="search-label">Search ballots<input id="searchBallots" type="search" placeholder="Event, names, judge, or resolution"></label></div><div class="ballot-workspace"><div id="ballotList" aria-label="Judge ballots"></div><article id="reader" tabindex="-1" aria-label="Selected ballot"></article></div>');
-    ['sourceFilter', 'eventFilter'].forEach(function (id) { document.getElementById(id).onchange = draw; });
+    panel.insertAdjacentHTML('beforeend', '<div class="filters"><label>Source<select id="eventFilter"><option value="">All sources</option></select></label><label class="search-label">Search ballots<input id="searchBallots" type="search" placeholder="Event, names, judge, or resolution"></label></div><div class="ballot-workspace"><div id="ballotList" aria-label="Judge ballots"></div><article id="reader" tabindex="-1" aria-label="Selected ballot"></article></div>');
+    document.getElementById('eventFilter').onchange = draw;
     document.getElementById('searchBallots').oninput = draw;
+    var mobileBallots = window.matchMedia('(max-width:760px)');
+    mobileBallots.addEventListener('change', placeReader);
+    function placeReader() {
+      if (!active) return;
+      var reader = document.getElementById('reader');
+      var button = panel.querySelector('.ballot-card[aria-pressed=true]');
+      var workspace = panel.querySelector('.ballot-workspace');
+      (mobileBallots.matches && button ? button.parentElement : workspace).appendChild(reader);
+      panel.querySelectorAll('.ballot-card').forEach(function (card) {
+        if (mobileBallots.matches) card.setAttribute('aria-expanded', card.getAttribute('aria-pressed'));
+        else card.removeAttribute('aria-expanded');
+      });
+    }
     var retryButton = text(panel, 'button', 'Retry', 'retry'); retryButton.id = 'retryBallots'; retryButton.hidden = true; retryButton.onclick = loadBallots;
     function validateBallots(d) {
       dataCheck(isObject(d) && d.ok === true && d.student === data.name && Array.isArray(d.ballots));
@@ -294,10 +307,10 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
       });
     }
     var generation = 0, active = true, busy = false, aborter;
-    var refreshButton = text(app.querySelector('nav'), 'button', 'Refresh', 'refresh'); refreshButton.id = 'refreshStudent'; refreshButton.onclick = refresh;
     retryButton.onclick = refresh;
     function stop() {
       active = false; generation++; if (aborter) aborter.abort();
+      mobileBallots.removeEventListener('change', placeReader);
       ballots = []; selected = ''; panel.replaceChildren();
       app.classList.remove('student-view'); render(data);
     }
@@ -346,8 +359,8 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
         validateBallots(d);
         ballots = d.ballots;
         var events = document.getElementById('eventFilter'), previous = events.value;
-        events.innerHTML = '<option value="">All events</option>';
-        Array.from(new Set(ballots.map(function (b) { return b.event; }))).sort().forEach(function (event) { var option = document.createElement('option'); option.value = event; option.textContent = event || 'Event not supplied'; events.appendChild(option); });
+        events.innerHTML = '<option value="">All sources</option>';
+        Array.from(new Set(ballots.map(function (b) { return b.event; }))).sort().forEach(function (event) { var option = document.createElement('option'); option.value = event; var sample = ballots.find(function (b) { return b.event === event; }); option.textContent = eventLabel(event, sample.date, sample.sourceKind); events.appendChild(option); });
         events.value = previous; if (events.selectedIndex < 0) events.value = '';
         draw();
       }).catch(function () { if (active && g === generation) failure(); });
@@ -357,27 +370,42 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
       if (className) node.className = className;
       parent.appendChild(node); return node;
     }
+    // Presentation aliases only: preserve source event names and filter values.
+    function eventLabel(event, date, sourceKind) {
+      if (sourceKind !== 'tournament') return event || 'Event not supplied';
+      var short = /MTSU|Pejaver/i.test(event) ? 'MTSU' : /Southern Mississippi|Hub City Swing/i.test(event) ? 'USM' : /Razorback Rumble|UARK/i.test(event) ? 'UARK' : '';
+      var year = (event.match(/\b(?:19|20)\d{2}\b/) || String(date || '').match(/^(?:19|20)\d{2}/) || [''])[0];
+      return short ? short + (year ? ' ' + year : '') : event || 'Event not supplied';
+    }
     function points(b) { return b.studentPoints === null || b.studentPoints === '' ? 'Not supplied' : String(b.studentPoints); }
     function draw() {
       var query = document.getElementById('searchBallots').value.trim().toLowerCase();
-      var source = document.getElementById('sourceFilter').value, event = document.getElementById('eventFilter').value;
-      var found = ballots.filter(function (b) { return (!source || b.sourceKind === source) && (!event || b.event === event) && [b.event,b.judge,b.resolution,b.round,b.format].concat(b.affNames,b.negNames).join(' ').toLowerCase().includes(query); });
+      var event = document.getElementById('eventFilter').value;
+      var found = ballots.filter(function (b) { return (!event || b.event === event) && [b.event,eventLabel(b.event,b.date,b.sourceKind),b.judge,b.resolution,b.round,b.format].concat(b.affNames,b.negNames).join(' ').toLowerCase().includes(query); });
       document.getElementById('ballotStatus').textContent = !ballots.length ? 'No ballots yet.' : !found.length ? 'No matching ballots. Try another filter or search.' : found.length + ' judge ballots · Each panel judge is separate · Not a qualification-credit count';
       var list = document.getElementById('ballotList'), reader = document.getElementById('reader');
+      panel.querySelector('.ballot-workspace').appendChild(reader);
       list.replaceChildren(); reader.replaceChildren(); reader.hidden = !found.length;
       if (!found.length) return;
       if (!found.some(function (b) { return b.id === selected; })) selected = found[0].id;
       found.forEach(function (b) {
-        var button = text(list, 'button', '', 'ballot-card'); button.type = 'button'; button.setAttribute('aria-pressed', b.id === selected);
+        var item = text(list, 'div', '', 'ballot-item');
+        var button = text(item, 'button', '', 'ballot-card'); button.type = 'button'; button.setAttribute('aria-pressed', b.id === selected);
         text(button, 'span', (b.sourceKind === 'practice' ? 'Practice' : 'Tournament') + ' · ' + b.format, 'chip');
-        text(button, 'strong', b.event || 'Event not supplied');
+        text(button, 'strong', eventLabel(b.event,b.date,b.sourceKind));
         text(button, 'span', [b.date,b.round,b.judge].filter(Boolean).join(' · '));
         text(button, 'span', 'Your result: ' + (b.studentResult || 'Not supplied') + ' · Your points: ' + points(b));
-        button.onclick = function () { selected = b.id; draw(); reader.focus({preventScroll:true}); if (window.innerWidth < 761) reader.scrollIntoView({block:'start'}); };
+        button.onclick = function () {
+          selected = b.id; draw();
+          if (mobileBallots.matches) {
+            var header = list.querySelector('.ballot-card[aria-pressed=true]');
+            header.focus({preventScroll:true}); header.scrollIntoView({block:'start'});
+          } else reader.focus({preventScroll:true});
+        };
       });
       var b = found.find(function (b) { return b.id === selected; });
       text(reader, 'span', b.sourceKind + ' / ' + b.format, 'eyebrow');
-      text(reader, 'h2', b.event || 'Event not supplied');
+      text(reader, 'h2', eventLabel(b.event,b.date,b.sourceKind));
       text(reader, 'p', [b.date,b.round,'Judge: ' + (b.judge || 'Not supplied')].filter(Boolean).join(' · '));
       text(reader, 'p', 'Your side: ' + b.studentSide);
       text(reader, 'p', 'Aff: ' + (b.affNames.join(' & ') || 'Not supplied'));
@@ -389,6 +417,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
       b.scores.forEach(function (s) { text(reader, 'p', s.label + ': ' + (s.value || 'Not supplied')); });
       [['Strengths',b.strengths],['To improve',b.improve],['Reason for decision',b.rfd],['Your focus',b.focus],['Focus feedback',b.focusResponse]].forEach(function (pair) { text(reader,'h3',pair[0]); text(reader,'p',pair[1] || 'Not supplied','feedback'); });
       text(reader, 'small', b.provenance);
+      placeReader();
     }
   }
 
