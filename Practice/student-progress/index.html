@@ -372,6 +372,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
     }
     // Presentation aliases only: preserve source event names and filter values.
     function eventLabel(event, date, sourceKind) {
+      if (sourceKind === 'practice') return 'Practice';
       if (sourceKind !== 'tournament') return event || 'Event not supplied';
       var short = /MTSU|Pejaver/i.test(event) ? 'MTSU' : /Southern Mississippi|Hub City Swing/i.test(event) ? 'USM' : /Razorback Rumble|UARK/i.test(event) ? 'UARK' : '';
       var year = (event.match(/\b(?:19|20)\d{2}\b/) || String(date || '').match(/^(?:19|20)\d{2}/) || [''])[0];
@@ -415,7 +416,10 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
       text(result, 'p', 'Your result: ' + (b.studentResult || 'Not supplied'), b.studentResult === 'W' ? 'win' : b.studentResult === 'L' ? 'loss' : '');
       text(result, 'p', 'Your points: ' + points(b));
       b.scores.forEach(function (s) { text(reader, 'p', s.label + ': ' + (s.value || 'Not supplied')); });
-      [['Strengths',b.strengths],['To improve',b.improve],['Reason for decision',b.rfd],['Your focus',b.focus],['Focus feedback',b.focusResponse]].forEach(function (pair) { text(reader,'h3',pair[0]); text(reader,'p',pair[1] || 'Not supplied','feedback'); });
+      [['Strengths',b.strengths],['To improve',b.improve],['Reason for decision',b.rfd]].forEach(function (pair) { text(reader,'h3',pair[0]); text(reader,'p',pair[1] || 'Not supplied','feedback'); });
+      [['Your focus',b.focus],['Focus feedback',b.focusResponse]].forEach(function (pair) {
+        if (pair[1] && pair[1].trim()) { text(reader,'h3',pair[0]); text(reader,'p',pair[1],'feedback'); }
+      });
       text(reader, 'small', b.provenance);
       placeReader();
     }
