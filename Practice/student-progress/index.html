@@ -142,6 +142,43 @@
     .header h1 { font-size: 1.3rem; }
   }
 </style>
+<!-- Pilot styles are scoped: the original stylesheet and OFF layout are unchanged. -->
+<style>
+.student-view{max-width:1120px;color:#202c40;line-height:1.55;margin:12px auto}
+.student-view [hidden]{display:none!important}
+.student-view button,.student-view input,.student-view select{font:inherit;outline-offset:4px;max-width:100%;min-width:0}
+.student-view button{min-height:44px;border:1px solid #cdd4df;border-radius:8px;background:#fff;color:#243750;padding:9px 14px;cursor:pointer}
+.student-view button:hover{background:#edf1f8}
+.student-view nav{display:flex;gap:8px;flex-wrap:wrap;background:#1e2e47;padding:20px 24px;border-radius:16px;margin-bottom:20px}
+.student-view nav button{background:transparent;color:#fff;border-color:#69778a}
+.student-view nav button[aria-pressed=true]{background:#fff;color:#1e2e47}
+.student-view nav .refresh{margin-left:auto}
+.student-view #progressPanel{max-width:760px;margin:0 auto}
+.student-view .header{background:#1e2e47}
+.student-view #ballotsPanel>h2{font-size:24px}
+.student-view #ballotStatus{color:#5f6b7b;margin:4px 0 18px}
+.student-view .filters{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}
+.student-view .filters label{display:flex;flex-direction:column;gap:4px;color:#4a586c;font-size:13px;min-width:0;flex:1}
+.student-view .filters .search-label{flex:2}
+.student-view input,.student-view select{border:1px solid #cdd4df;border-radius:8px;background:#fff;padding:10px;min-height:44px;width:100%}
+.student-view .ballot-workspace{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start}
+.student-view #ballotList{display:grid;gap:10px;min-width:0}
+.student-view .ballot-card{text-align:left;width:100%;display:flex;flex-direction:column;gap:7px;overflow-wrap:anywhere;padding:16px;color:#243750}
+.student-view .ballot-card[aria-pressed=true]{border-color:#597394;background:#e9eff7;color:#202c40;box-shadow:inset 3px 0 #597394}
+.student-view .ballot-card strong{font-size:17px}
+.student-view .ballot-card span{font-size:13px}
+.student-view .chip{background:#e8edf3;border-radius:5px;padding:3px 7px;align-self:flex-start}
+.student-view #reader{min-width:0;background:white;border:1px solid #dce1e8;border-radius:12px;padding:24px;overflow-wrap:anywhere}
+.student-view #reader h2{font-size:23px;margin:5px 0 8px}
+.student-view #reader h3{font-size:15px;margin:22px 0 6px}
+.student-view #reader p{margin:5px 0}
+.student-view .feedback{white-space:pre-wrap;overflow-wrap:anywhere}
+.student-view .eyebrow{text-transform:uppercase;letter-spacing:1.8px;font-size:11px;font-weight:700}
+.student-view .own-result{display:flex;flex-wrap:wrap;gap:12px 28px;border-block:1px solid #dce1e8;padding:12px 0;margin:20px 0;font-weight:600}
+.student-view .win{color:#137333}.student-view .loss{color:#a52923}
+.student-view small{display:block;color:#5f6b7b;margin-top:22px}
+@media(max-width:760px){.student-view .ballot-workspace{grid-template-columns:minmax(0,1fr)}.student-view .filters label{flex-basis:40%}.student-view .filters .search-label{flex-basis:100%}.student-view #reader{padding:18px}.student-view nav{padding:14px}.student-view nav .refresh{margin-left:0}}
+</style>
 </head>
 <body>
 <div class="container" id="app">
@@ -204,6 +241,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
           return;
         }
         render(data);
+        if (isObject(data.features) && data.features.newStudentView === true) enableStudentView(data);
       } catch (err) {
         showError('Data Error', 'The server returned invalid progress data. Contact your coach.');
       }
@@ -219,6 +257,140 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
         showError('Connection Error', 'Could not reach the server. Try refreshing in a moment.');
       }
     }).finally(function () { clearTimeout(requestTimer); });
+
+  function enableStudentView(data) {
+    var legacy = app.innerHTML;
+    app.classList.add('student-view');
+    app.innerHTML = '<nav aria-label="Student page"><button id="progressTab" aria-pressed="true">My Progress</button><button id="ballotsTab" aria-pressed="false">My Ballots</button></nav><section id="progressPanel"></section><section id="ballotsPanel" hidden><h2>My Ballots</h2><p id="ballotStatus" role="status"></p></section>';
+    document.getElementById('progressPanel').innerHTML = legacy;
+    var loaded = false;
+    document.getElementById('progressTab').onclick = function () { tab(false); };
+    document.getElementById('ballotsTab').onclick = function () { tab(true); if (!loaded) { loaded = true; loadBallots(); } };
+    function tab(ballots) {
+      document.getElementById('progressPanel').hidden = ballots;
+      document.getElementById('ballotsPanel').hidden = !ballots;
+      document.getElementById('progressTab').setAttribute('aria-pressed', !ballots);
+      document.getElementById('ballotsTab').setAttribute('aria-pressed', ballots);
+    }
+    var ballots = [], selected = '';
+    var panel = document.getElementById('ballotsPanel');
+    panel.insertAdjacentHTML('beforeend', '<div class="filters"><label>Source<select id="sourceFilter"><option value="">All sources</option><option value="practice">Practice</option><option value="tournament">Tournament</option></select></label><label>Event<select id="eventFilter"><option value="">All events</option></select></label><label class="search-label">Search ballots<input id="searchBallots" type="search" placeholder="Event, names, judge, or resolution"></label></div><div class="ballot-workspace"><div id="ballotList" aria-label="Judge ballots"></div><article id="reader" tabindex="-1" aria-label="Selected ballot"></article></div>');
+    ['sourceFilter', 'eventFilter'].forEach(function (id) { document.getElementById(id).onchange = draw; });
+    document.getElementById('searchBallots').oninput = draw;
+    var retryButton = text(panel, 'button', 'Retry', 'retry'); retryButton.id = 'retryBallots'; retryButton.hidden = true; retryButton.onclick = loadBallots;
+    function validateBallots(d) {
+      dataCheck(isObject(d) && d.ok === true && d.student === data.name && Array.isArray(d.ballots));
+      var ids = new Set();
+      d.ballots.forEach(function (b) {
+        dataCheck(isObject(b));
+        texts(b,['id','sourceKind','event','date','round','format','judge','resolution','studentSide','strengths','improve','rfd','focus','focusResponse','provenance']);
+        dataCheck(b.id.length > 0 && !ids.has(b.id)); ids.add(b.id);
+        dataCheck(['practice','tournament'].includes(b.sourceKind) && ['IPDA','TIPDA','Unknown'].includes(b.format) && ['Aff','Neg','Unknown'].includes(b.studentSide));
+        dataCheck(b.date === '' || /^\d{4}-\d{2}-\d{2}$/.test(b.date));
+        dataCheck(b.studentResult === null || ['W','L'].includes(b.studentResult));
+        dataCheck(b.studentPoints === null || typeof b.studentPoints === 'string' || (typeof b.studentPoints === 'number' && Number.isFinite(b.studentPoints)));
+        missed(b.affNames); missed(b.negNames);
+        dataCheck(Array.isArray(b.scores)); b.scores.forEach(function (s) { dataCheck(isObject(s)); texts(s,['label','value']); });
+      });
+    }
+    var generation = 0, active = true, busy = false, aborter;
+    var refreshButton = text(app.querySelector('nav'), 'button', 'Refresh', 'refresh'); refreshButton.id = 'refreshStudent'; refreshButton.onclick = refresh;
+    retryButton.onclick = refresh;
+    function stop() {
+      active = false; generation++; if (aborter) aborter.abort();
+      ballots = []; selected = ''; panel.replaceChildren();
+      app.classList.remove('student-view'); render(data);
+    }
+    function refresh() {
+      if (!active) return;
+      var wantsBallots = !document.getElementById('ballotsPanel').hidden || loaded;
+      var g = ++generation; if (aborter) aborter.abort();
+      busy = true; ballots = []; draw(); retryButton.hidden = true;
+      document.getElementById('ballotStatus').textContent = 'Checking access and refreshing…';
+      request(url).then(function (d) {
+        if (!active || g !== generation) return;
+        if (isObject(d) && typeof d.error === 'string') { stop(); showError('Error', d.error); return; }
+        validate(d); data = d;
+        if (!isObject(d.features) || d.features.newStudentView !== true) { stop(); return; }
+        // Reuse the unchanged qualification renderer without replacing the live controls.
+        var shell = Array.from(app.childNodes);
+        render(d); var progressHTML = app.innerHTML;
+        app.replaceChildren.apply(app, shell);
+        document.getElementById('progressPanel').innerHTML = progressHTML;
+        busy = false;
+        if (wantsBallots || loaded) loadBallots();
+      }).catch(function () { if (active && g === generation) { busy = false; failure(); } });
+    }
+    function request(endpoint) {
+      var controller = new AbortController(); aborter = controller;
+      var timer;
+      // Race the deadline explicitly: even a transport that ignores abort cannot publish late data.
+      return Promise.race([
+        fetch(endpoint, {signal:controller.signal,cache:'no-store',referrerPolicy:'no-referrer'}).then(function (r) { if (!r.ok) throw new Error('HTTP failure'); return r.json(); }),
+        new Promise(function (_, reject) { timer = setTimeout(function () { controller.abort(); reject(new Error('Timeout')); }, 20000); })
+      ]).finally(function () { clearTimeout(timer); });
+    }
+    function failure() {
+      ballots = []; draw();
+      document.getElementById('ballotStatus').textContent = 'We could not load your ballots. Your progress records have not changed.';
+      retryButton.hidden = false;
+    }
+    function loadBallots() {
+      if (!active || busy) return;
+      var g = ++generation; if (aborter) aborter.abort();
+      ballots = []; draw(); retryButton.hidden = true;
+      document.getElementById('ballotStatus').textContent = 'Loading your ballots…';
+      request(url + '&view=student-ballots').then(function (d) {
+        if (!active || g !== generation) return;
+        if (isObject(d) && d.ok === false && d.code === 'DENIED' && typeof d.message === 'string') { stop(); return; }
+        validateBallots(d);
+        ballots = d.ballots;
+        var events = document.getElementById('eventFilter'), previous = events.value;
+        events.innerHTML = '<option value="">All events</option>';
+        Array.from(new Set(ballots.map(function (b) { return b.event; }))).sort().forEach(function (event) { var option = document.createElement('option'); option.value = event; option.textContent = event || 'Event not supplied'; events.appendChild(option); });
+        events.value = previous; if (events.selectedIndex < 0) events.value = '';
+        draw();
+      }).catch(function () { if (active && g === generation) failure(); });
+    }
+    function text(parent, tag, value, className) {
+      var node = document.createElement(tag); node.textContent = value;
+      if (className) node.className = className;
+      parent.appendChild(node); return node;
+    }
+    function points(b) { return b.studentPoints === null || b.studentPoints === '' ? 'Not supplied' : String(b.studentPoints); }
+    function draw() {
+      var query = document.getElementById('searchBallots').value.trim().toLowerCase();
+      var source = document.getElementById('sourceFilter').value, event = document.getElementById('eventFilter').value;
+      var found = ballots.filter(function (b) { return (!source || b.sourceKind === source) && (!event || b.event === event) && [b.event,b.judge,b.resolution,b.round,b.format].concat(b.affNames,b.negNames).join(' ').toLowerCase().includes(query); });
+      document.getElementById('ballotStatus').textContent = !ballots.length ? 'No ballots yet.' : !found.length ? 'No matching ballots. Try another filter or search.' : found.length + ' judge ballots · Each panel judge is separate · Not a qualification-credit count';
+      var list = document.getElementById('ballotList'), reader = document.getElementById('reader');
+      list.replaceChildren(); reader.replaceChildren(); reader.hidden = !found.length;
+      if (!found.length) return;
+      if (!found.some(function (b) { return b.id === selected; })) selected = found[0].id;
+      found.forEach(function (b) {
+        var button = text(list, 'button', '', 'ballot-card'); button.type = 'button'; button.setAttribute('aria-pressed', b.id === selected);
+        text(button, 'span', (b.sourceKind === 'practice' ? 'Practice' : 'Tournament') + ' · ' + b.format, 'chip');
+        text(button, 'strong', b.event || 'Event not supplied');
+        text(button, 'span', [b.date,b.round,b.judge].filter(Boolean).join(' · '));
+        text(button, 'span', 'Your result: ' + (b.studentResult || 'Not supplied') + ' · Your points: ' + points(b));
+        button.onclick = function () { selected = b.id; draw(); reader.focus({preventScroll:true}); if (window.innerWidth < 761) reader.scrollIntoView({block:'start'}); };
+      });
+      var b = found.find(function (b) { return b.id === selected; });
+      text(reader, 'span', b.sourceKind + ' / ' + b.format, 'eyebrow');
+      text(reader, 'h2', b.event || 'Event not supplied');
+      text(reader, 'p', [b.date,b.round,'Judge: ' + (b.judge || 'Not supplied')].filter(Boolean).join(' · '));
+      text(reader, 'p', 'Your side: ' + b.studentSide);
+      text(reader, 'p', 'Aff: ' + (b.affNames.join(' & ') || 'Not supplied'));
+      text(reader, 'p', 'Neg: ' + (b.negNames.join(' & ') || 'Not supplied'));
+      text(reader, 'h3', 'Resolution'); text(reader, 'p', b.resolution || 'Not supplied');
+      var result = text(reader, 'div', '', 'own-result');
+      text(result, 'p', 'Your result: ' + (b.studentResult || 'Not supplied'), b.studentResult === 'W' ? 'win' : b.studentResult === 'L' ? 'loss' : '');
+      text(result, 'p', 'Your points: ' + points(b));
+      b.scores.forEach(function (s) { text(reader, 'p', s.label + ': ' + (s.value || 'Not supplied')); });
+      [['Strengths',b.strengths],['To improve',b.improve],['Reason for decision',b.rfd],['Your focus',b.focus],['Focus feedback',b.focusResponse]].forEach(function (pair) { text(reader,'h3',pair[0]); text(reader,'p',pair[1] || 'Not supplied','feedback'); });
+      text(reader, 'small', b.provenance);
+    }
+  }
 
   function showError(title, msg) {
     app.innerHTML = '<div class="error-msg"><h2>' + esc(title) + '</h2>' +
