@@ -178,6 +178,16 @@
 .student-view .win{color:#137333}.student-view .loss{color:#a52923}
 .student-view small{display:block;color:#5f6b7b;margin-top:22px}
 @media(max-width:760px){.student-view .ballot-workspace{grid-template-columns:minmax(0,1fr)}.student-view .filters label{flex-basis:40%}.student-view .filters .search-label{flex-basis:100%}.student-view #reader{padding:18px}.student-view nav{padding:14px}.student-view nav .refresh{margin-left:0}}
+
+@media(max-width:760px){
+ .student-view .ballot-item{border:1px solid #cdd4df;border-radius:10px;overflow:hidden;background:#fff}
+ .student-view .ballot-item.expanded,.student-view .ballot-item.closing{border-color:#597394;box-shadow:inset 3px 0 #597394}
+ .student-view .ballot-item>.ballot-card{position:relative;border:0;border-radius:0;padding-right:42px}
+ .student-view .ballot-card::after{content:'';position:absolute;right:19px;top:23px;width:8px;height:8px;border-right:2px solid #597394;border-bottom:2px solid #597394;transform:rotate(45deg);transition:transform 220ms ease-out}
+ .student-view .ballot-card[aria-expanded=true]::after{transform:rotate(225deg)}
+ .student-view .ballot-item>#reader{border:0;border-top:1px solid #cdd4df;border-radius:0;margin:0;box-shadow:inset 3px 0 #597394}
+}
+@media(prefers-reduced-motion:reduce){.student-view .ballot-card::after{transition:none}}
 </style>
 </head>
 <body>
@@ -272,7 +282,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
       document.getElementById('progressTab').setAttribute('aria-pressed', !ballots);
       document.getElementById('ballotsTab').setAttribute('aria-pressed', ballots);
     }
-    var ballots = [], selected = '';
+    var ballots = [], selected = '', collapsed = false, readerMotion = null;
     var panel = document.getElementById('ballotsPanel');
     panel.insertAdjacentHTML('beforeend', '<div class="filters"><label>Source<select id="eventFilter"><option value="">All sources</option></select></label><label class="search-label">Search ballots<input id="searchBallots" type="search" placeholder="Event, names, judge, or resolution"></label></div><div class="ballot-workspace"><div id="ballotList" aria-label="Judge ballots"></div><article id="reader" tabindex="-1" aria-label="Selected ballot"></article></div>');
     document.getElementById('eventFilter').onchange = draw;
@@ -282,13 +292,47 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
     function placeReader() {
       if (!active) return;
       var reader = document.getElementById('reader');
+      cancelReaderMotion();
       var button = panel.querySelector('.ballot-card[aria-pressed=true]');
       var workspace = panel.querySelector('.ballot-workspace');
       (mobileBallots.matches && button ? button.parentElement : workspace).appendChild(reader);
+      reader.hidden = !button || (mobileBallots.matches && collapsed);
       panel.querySelectorAll('.ballot-card').forEach(function (card) {
-        if (mobileBallots.matches) card.setAttribute('aria-expanded', card.getAttribute('aria-pressed'));
-        else card.removeAttribute('aria-expanded');
+        var open = card.getAttribute('aria-pressed') === 'true' && !collapsed;
+        card.parentElement.classList.toggle('expanded', mobileBallots.matches && open);
+        card.parentElement.classList.remove('closing');
+        if (mobileBallots.matches) {
+          card.setAttribute('aria-expanded', String(open));
+          card.setAttribute('aria-controls', 'reader');
+        } else { card.removeAttribute('aria-expanded'); card.removeAttribute('aria-controls'); }
       });
+    }
+    function cancelReaderMotion() {
+      if (readerMotion) { readerMotion.cancel(); readerMotion = null; }
+      var reader = document.getElementById('reader');
+      if (reader) reader.style.overflow = '';
+    }
+    function animateReader(open, fromHeight) {
+      var reader = document.getElementById('reader');
+      cancelReaderMotion();
+      if (!mobileBallots.matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches || !reader.animate) {
+        reader.hidden = !open; return;
+      }
+      reader.hidden = false;
+      var height = reader.getBoundingClientRect().height;
+      var item = reader.parentElement;
+      item.classList.toggle('closing', !open);
+      reader.style.overflow = 'hidden';
+      var motion = reader.animate([
+        {height: (fromHeight == null ? (open ? 0 : height) : fromHeight) + 'px', opacity: open ? 0 : 1},
+        {height: (open ? height : 0) + 'px', opacity: open ? 1 : 0}
+      ], {duration: 220, easing: 'ease-out'});
+      readerMotion = motion;
+      motion.onfinish = function () {
+        if (readerMotion !== motion) return;
+        readerMotion = null; reader.style.overflow = ''; reader.hidden = !open;
+        item.classList.remove('closing');
+      };
     }
     var retryButton = text(panel, 'button', 'Retry', 'retry'); retryButton.id = 'retryBallots'; retryButton.hidden = true; retryButton.onclick = loadBallots;
     function validateBallots(d) {
@@ -311,6 +355,7 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
     function stop() {
       active = false; generation++; if (aborter) aborter.abort();
       mobileBallots.removeEventListener('change', placeReader);
+      cancelReaderMotion();
       ballots = []; selected = ''; panel.replaceChildren();
       app.classList.remove('student-view'); render(data);
     }
@@ -385,10 +430,11 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
       var found = ballots.filter(function (b) { return (!event || b.event === event) && [b.event,eventLabel(b.event,b.date,b.sourceKind),b.judge,b.resolution,b.round,b.format].concat(b.affNames,b.negNames).join(' ').toLowerCase().includes(query); });
       document.getElementById('ballotStatus').textContent = !ballots.length ? 'No ballots yet.' : !found.length ? 'No matching ballots. Try another filter or search.' : found.length + ' judge ballots · Each panel judge is separate · Not a qualification-credit count';
       var list = document.getElementById('ballotList'), reader = document.getElementById('reader');
+      cancelReaderMotion();
       panel.querySelector('.ballot-workspace').appendChild(reader);
       list.replaceChildren(); reader.replaceChildren(); reader.hidden = !found.length;
       if (!found.length) return;
-      if (!found.some(function (b) { return b.id === selected; })) selected = found[0].id;
+      if (!found.some(function (b) { return b.id === selected; })) { selected = found[0].id; collapsed = false; }
       found.forEach(function (b) {
         var item = text(list, 'div', '', 'ballot-item');
         var button = text(item, 'button', '', 'ballot-card'); button.type = 'button'; button.setAttribute('aria-pressed', b.id === selected);
@@ -397,8 +443,15 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
         text(button, 'span', [b.date,b.round,b.judge].filter(Boolean).join(' · '));
         text(button, 'span', 'Your result: ' + (b.studentResult || 'Not supplied') + ' · Your points: ' + points(b));
         button.onclick = function () {
-          selected = b.id; draw();
+          if (mobileBallots.matches && selected === b.id) {
+            var height = reader.hidden ? 0 : reader.getBoundingClientRect().height;
+            collapsed = !collapsed; placeReader(); animateReader(!collapsed, height);
+            button.focus({preventScroll:true});
+            return;
+          }
+          selected = b.id; collapsed = false; draw();
           if (mobileBallots.matches) {
+            animateReader(true);
             var header = list.querySelector('.ballot-card[aria-pressed=true]');
             header.focus({preventScroll:true}); header.scrollIntoView({block:'start'});
           } else reader.focus({preventScroll:true});
