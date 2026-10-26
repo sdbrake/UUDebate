@@ -440,7 +440,9 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbx4SKpmVHMlCAE7vnuon95Pn_
         var button = text(item, 'button', '', 'ballot-card'); button.type = 'button'; button.setAttribute('aria-pressed', b.id === selected);
         text(button, 'span', (b.sourceKind === 'practice' ? 'Practice' : 'Tournament') + ' · ' + b.format, 'chip');
         text(button, 'strong', eventLabel(b.event,b.date,b.sourceKind));
-        text(button, 'span', [b.date,b.round,b.judge].filter(Boolean).join(' · '));
+        var opponents = b.studentSide === 'Aff' ? b.negNames : b.studentSide === 'Neg' ? b.affNames : [];
+        var opponentLabel = opponents.length ? 'vs. ' + opponents.join(' & ') : 'Opponent not supplied';
+        text(button, 'span', [b.date,b.round,opponentLabel].filter(Boolean).join(' · '));
         text(button, 'span', 'Your result: ' + (b.studentResult || 'Not supplied') + ' · Your points: ' + points(b));
         button.onclick = function () {
           if (mobileBallots.matches && selected === b.id) {
