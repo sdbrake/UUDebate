@@ -104,7 +104,7 @@ dialog{max-width:760px;width:calc(100% - 40px);max-height:90dvh;margin:auto;padd
 <p id="selection-summary" class="selection-summary" aria-live="polite"></p>
 <p id="registration-error" class="error" role="alert" hidden></p>
 <p id="registration-status" class="status" role="status"></p>
-<div id="registration-attachments"><section id="attachment-panel" class="attachment-panel" aria-labelledby="attachment-title"><h3 id="attachment-title" class="attachment-title">Files <span id="files-optional"></span></h3><input class="file-input" id="proof-files" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif,image/bmp,image/tiff,video/mp4,video/quicktime,video/webm,video/x-msvideo,video/mpeg,video/ogg,video/x-m4v,video/3gpp,video/mp2t,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.avif,.bmp,.tif,.tiff,.mp4,.mov,.webm,.avi,.mpeg,.mpg,.ogv,.m4v,.3gp,.ts,.pdf" hidden aria-describedby="file-help"><p class="helper" id="file-help">Max: 10 files · 2 GiB/file · 4 GiB total</p><h4 id="file-list-heading" hidden>Attached files</h4><ul id="file-list" class="file-list" aria-live="polite"></ul><p id="proof-error" class="error" role="alert" hidden></p></section></div><div class="actions" id="registration-actions"><button id="attach-files" class="button attach-button" type="button" aria-controls="proof-files">Attach files</button><button id="register-button" class="button" type="submit">Continue</button><button id="start-over-button" class="button secondary" type="button" hidden>New submission</button></div>
+<div id="registration-attachments"><section id="attachment-panel" class="attachment-panel" aria-labelledby="attachment-title"><h3 id="attachment-title" class="attachment-title">Files <span id="files-optional"></span></h3><input class="file-input" id="proof-files" type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,image/avif,image/bmp,image/tiff,video/mp4,video/quicktime,video/webm,video/x-msvideo,video/mpeg,video/ogg,video/x-m4v,video/3gpp,video/mp2t,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.avif,.bmp,.tif,.tiff,.mp4,.mov,.webm,.avi,.mpeg,.mpg,.ogv,.m4v,.3gp,.ts,.pdf" hidden aria-describedby="file-help"><p class="helper" id="file-help">Max: 10 files · 20 GiB/file · 40 GiB total</p><h4 id="file-list-heading" hidden>Attached files</h4><ul id="file-list" class="file-list" aria-live="polite"></ul><p id="proof-error" class="error" role="alert" hidden></p></section></div><div class="actions" id="registration-actions"><button id="attach-files" class="button attach-button" type="button" aria-controls="proof-files">Attach files</button><button id="register-button" class="button" type="submit">Continue</button><button id="start-over-button" class="button secondary" type="button" hidden>New submission</button></div>
 </form>
 </section>
 <section id="proof-step" hidden>
@@ -137,8 +137,8 @@ dialog{max-width:760px;width:calc(100% - 40px);max-height:90dvh;margin:auto;padd
 const SUBMISSION_APP_URL = "https://script.google.com/macros/s/AKfycbxI7drZYrxYNDJNsJ_1LMc6_FrAJhOsc1M1HiHpFcX9SjQJd_UaM_du98kzHMjWUbTJuQ/exec";
 const ROSTER_SNAPSHOT = ["Aben Hayes", "Anna La Pour", "Audrey Mae Taylor", "Braeden Helmick", "Bronson Gutierrez", "Caleb Stubbs", "Daisy Murfey", "Eliana Snyder", "Emily Adams", "Faith Atwater", "Hailey Parker", "Izzy Mejia-Aveledo", "Jake Leckrone", "Jonathan Manwaring", "Lydia Stinnett", "Maycee Hufstedler", "Micah Laliberty", "Michael McDonnell", "Natalia Mapunda", "Peyton Amicone", "Samuel Jared"];
 const MAX_FILES = 10;
-const MAX_FILE_SIZE = 2 * 1024 ** 3;
-const MAX_TOTAL = 4 * 1024 ** 3;
+const MAX_FILE_SIZE = 20 * 1024 ** 3;
+const MAX_TOTAL = 40 * 1024 ** 3;
 const CHUNK_SIZE = 4194304;
 const CATEGORIES = [{id:'true',name:'Truth Challenge'},{id:'beauty',name:'Beauty Challenge'},{id:'good',name:'Goodness Challenge'}];
 const CHALLENGES = [
@@ -306,11 +306,11 @@ function validateFiles(files,ids){
   let total=0;
   for(const file of files){
     if(!Number.isSafeInteger(file.size)||file.size<=0)return 'Empty or unreadable file';
-    if(file.size>MAX_FILE_SIZE)return 'File limit: 2 GiB';
+    if(file.size>MAX_FILE_SIZE)return 'File limit: 20 GiB';
     if(!ALLOWED_MIMES.has(mimeFor(file)))return 'Unsupported file type';
     total+=file.size;
   }
-  if(total>MAX_TOTAL)return 'Total file limit: 4 GiB';
+  if(total>MAX_TOTAL)return 'Total file limit: 40 GiB';
   for(const c of CHALLENGES.filter(item=>ids.includes(item.id))){
     if(c.kind==='recitation')continue;
     const covered=files.some(file=>{const type=mimeFor(file);return c.kind==='video'?type.startsWith('video/'):c.kind==='image'?type.startsWith('image/'):type.startsWith('image/')||type==='application/pdf';});
